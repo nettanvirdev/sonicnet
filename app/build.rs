@@ -22,7 +22,7 @@ fn main() {
             // FileVersion / ProductVersion come from the package version automatically.
             .set("ProductName", "SonicNet")
             .set("FileDescription", "SonicNet") // what Task Manager shows
-            .set("LegalCopyright", "Copyright (c) 2026 the SonicNet authors")
+            .set("LegalCopyright", "Copyright (c) 2026 Tanvir Ahamed")
             .set("OriginalFilename", "sonicnet.exe");
         // Per binary: the System mode helper gets its own name, which is what UAC shows.
         app.compile_for("sonicnet")
@@ -32,7 +32,7 @@ fn main() {
             .set_manifest_file(MANIFEST)
             .set("ProductName", "SonicNet")
             .set("FileDescription", "SonicNet System mode")
-            .set("LegalCopyright", "Copyright (c) 2026 the SonicNet authors")
+            .set("LegalCopyright", "Copyright (c) 2026 Tanvir Ahamed")
             .set("OriginalFilename", "sonicnet-system.exe")
             .compile_for("sonicnet-system")
             .expect("embedding the helper's resources needs rc.exe (Windows SDK)");

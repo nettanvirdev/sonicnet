@@ -1,5 +1,5 @@
 SonicNet
-Copyright (c) 2026 the SonicNet authors. Licensed under the MIT License (see LICENSE).
+Copyright (c) 2026 Tanvir Ahamed. Licensed under the MIT License (see LICENSE).
 
 SonicNet is a Rust rewrite of the ideas in Plexo (https://github.com/anmolkapil/plexo): splitting
 one download across several internet connections, its download behaviour, and the scenarios its
