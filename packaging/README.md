@@ -63,7 +63,7 @@ fn main() {
             // FileVersion / ProductVersion come from the package version automatically.
             .set("ProductName", "SonicNet")
             .set("FileDescription", "SonicNet") // what Task Manager shows
-            .set("LegalCopyright", "Copyright (c) 2026 the SonicNet authors")
+            .set("LegalCopyright", "Copyright (c) 2026 Tanvir Ahamed")
             .set("OriginalFilename", "sonicnet.exe")
             .compile()
             .expect("embedding the Windows icon and manifest needs rc.exe (Windows SDK)");
