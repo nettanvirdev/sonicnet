@@ -1,0 +1,39 @@
+[package]
+name = "sonic-manager"
+description = "Runs downloads: the queue, each download's streams, pause and resume, persistence."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sonic-core.workspace = true
+sonic-net.workspace = true
+sonic-engine.workspace = true
+sonic-http.workspace = true
+sonic-store.workspace = true
+sonic-bridge.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+chrono.workspace = true
+url.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+open.workspace = true
+trash.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Power",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+sonic-testkit = { path = "../sonic-testkit" }
+tempfile.workspace = true
+tracing-subscriber.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

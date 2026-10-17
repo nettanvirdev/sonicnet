@@ -1,0 +1,942 @@
+// What an open download card shows below its header. Only the open card builds this; it reads
+// the one `App.detail` Rust keeps for it. Sub-sections are recessed panels — never lines.
+
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+import { Button, ButtonKind, IconButton, HoverTip } from "../components/button.slint";
+import { Checkbox, TextField } from "../components/inputs.slint";
+import { Badge, Panel, Label, Dot, Notice, ProgressBar, Tones } from "../components/display.slint";
+import { ThroughputChart, ShareBar } from "../components/chart.slint";
+import { App, DetailKind, NetLine, Tone } from "../types.slint";
+
+// Each network as a ribbon as thick as its speed, flowing into one capsule beside the total:
+// how the speed is made. Rust shapes the ribbons; the capsule spans where they meet.
+component FlowDiagram {
+    in property <[NetLine]> nets;
+    in property <float> flow-top;
+    in property <float> flow-bottom;
+    property <length> label-w: 104px;
+    property <length> start-x: label-w + 12px;
+    property <length> node-w: 10px;
+    property <length> node-x: root.width - node-w;
+
+    for n in root.nets: Path {
+        x: root.start-x;
+        width: root.node-x - root.start-x + 2px;
+        height: 100%;
+        viewbox-width: 100;
+        viewbox-height: 100;
+        fit: fill;
+        commands: n.curve;
+        fill: n.weight > 0 ? Theme.net(n.color).with-alpha(0.9) : Theme.track;
+    }
+    // Where every connection becomes one download.
+    Rectangle {
+        x: root.node-x;
+        y: root.flow-top * root.height - 4px;
+        width: root.node-w;
+        height: (root.flow-bottom - root.flow-top) * root.height + 8px;
+        border-radius: root.node-w / 2;
+        background: Theme.primary;
+        visible: root.flow-bottom > root.flow-top;
+    }
+    for n in root.nets: HorizontalLayout {
+        x: 0;
+        y: n.label-y * root.height - 17px;
+        width: root.label-w;
+        height: 34px;
+        spacing: 8px;
+        alignment: end;
+        VerticalLayout {
+            alignment: center;
+            spacing: 1px;
+            Text {
+                text: n.name;
+                color: n.weight > 0 ? Theme.card-text : Theme.muted;
+                font-size: Type.caption;
+                horizontal-alignment: right;
+                overflow: elide;
+            }
+            if n.weight > 0: Text {
+                text: n.speed;
+                color: Theme.text;
+                font-size: Type.caption;
+                font-weight: Type.medium;
+                horizontal-alignment: right;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Icons.kind(n.kind);
+                tint: n.weight > 0 ? Theme.net(n.color) : Theme.muted;
+                width: 15px;
+                height: 15px;
+            }
+        }
+    }
+}
+
+// One cell per block, painted by Rust into an image at the grid's exact pixel size.
+component BlockGrid {
+    in property <image> source;
+    in property <float> grid-w;
+    in property <float> grid-h;
+    in property <int> cols;
+    in property <float> pitch;
+    out property <string> readout: hover-index >= 0 ? App.block-info(hover-index) : "";
+
+    property <int> hover-index: ta.has-hover && root.pitch > 0
+        ? floor(ta.mouse-y / (root.pitch * 1px)) * root.cols + floor(ta.mouse-x / (root.pitch * 1px))
+        : -1;
+
+    height: max(16px, root.grid-h * 1px);
+    init => {
+        App.grid-resized(self.width);
+    }
+    changed width => {
+        App.grid-resized(self.width);
+    }
+
+    Image {
+        x: 0;
+        y: 0;
+        width: root.grid-w * 1px;
+        height: root.grid-h * 1px;
+        source: root.source;
+        image-fit: fill;
+    }
+    ta := TouchArea {
+        x: 0;
+        y: 0;
+        width: root.grid-w * 1px;
+        height: root.grid-h * 1px;
+    }
+}
+
+component Legend {
+    HorizontalLayout {
+        alignment: start;
+        // Only networks that are part of it: one switched off from the start adds nothing.
+        for n in App.detail-nets: HorizontalLayout {
+            if n.share > 0 || n.weight > 0: HorizontalLayout {
+                padding-right: 16px;
+                spacing: 6px;
+                VerticalLayout {
+                    alignment: center;
+                    Dot {
+                        size: 8px;
+                        color: Theme.net(n.color);
+                    }
+                }
+                Text {
+                    text: n.name;
+                    color: Theme.card-text;
+                    font-size: Type.caption;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+component StreamPill {
+    in property <string> label;
+    in property <string> speed;
+    in property <bool> hedge;
+    in property <bool> active;
+    in property <color> accent;
+
+    height: 30px;
+    Rectangle {
+        border-radius: Radius.xs;
+        background: root.label == "" ? transparent : root.hedge ? Theme.warning.with-alpha(0.1) : Theme.card;
+    }
+    if root.label != "": HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 7px;
+        VerticalLayout {
+            alignment: center;
+            Dot {
+                size: 6px;
+                color: root.active ? root.accent : Theme.track;
+            }
+        }
+        Text {
+            text: root.label;
+            color: Theme.card-text;
+            font-size: Type.caption;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        if root.hedge: Text {
+            text: "BACKUP";
+            color: Theme.warning;
+            font-size: Type.meta;
+            font-weight: Type.medium;
+            letter-spacing: 0.4px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.speed;
+            color: Theme.muted;
+            font-size: Type.stamp;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// Column widths shared by the table's header and rows.
+global Cols {
+    out property <length> status: 128px;
+    out property <length> speed: 88px;
+    out property <length> bytes: 88px;
+    out property <length> share: 112px;
+    out property <length> retries: 52px;
+    out property <length> toggle: 32px;
+}
+
+component NetworkRow {
+    in property <NetLine> net;
+    property <bool> problem: net.status-tone == Tone.warning || net.status-tone == Tone.danger;
+
+    Rectangle {
+        border-radius: Radius.control;
+        background: row-ta.has-hover ? Theme.hover : transparent;
+        row-ta := TouchArea { }
+    }
+    VerticalLayout {
+        HorizontalLayout {
+            height: 52px;
+            padding-left: 12px;
+            padding-right: 6px;
+            spacing: 12px;
+
+            VerticalLayout {
+                alignment: center;
+                Checkbox {
+                    checked: root.net.enabled;
+                    accent: Theme.net(root.net.color);
+                    accessible-label: "Use " + root.net.name;
+                    toggled(on) => {
+                        App.toggle-network(root.net.id, on);
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: Radius.control;
+                    background: Theme.net(root.net.color).with-alpha(Theme.dark ? 0.18 : 0.14);
+                    Icon {
+                        source: Icons.kind(root.net.kind);
+                        tint: Theme.net(root.net.color);
+                        width: 16px;
+                        height: 16px;
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 1px;
+                horizontal-stretch: 1;
+                min-width: 120px;
+                Text {
+                    text: root.net.name;
+                    color: root.net.enabled ? Theme.text : Theme.card-text;
+                    font-size: Type.control;
+                    font-weight: Type.medium;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.net.stream-count == 0 ? "No streams" : root.net.stream-count + (root.net.stream-count == 1 ? " stream" : " streams") + (root.net.hedges > 0 ? " · " + root.net.hedges + " backup" : "");
+                    color: Theme.muted;
+                    font-size: Type.caption;
+                    overflow: elide;
+                }
+            }
+            Rectangle {
+                width: Cols.status;
+                HorizontalLayout {
+                    spacing: 6px;
+                    VerticalLayout {
+                        alignment: center;
+                        Dot {
+                            size: 6px;
+                            color: root.net.status-tone == Tone.neutral ? Theme.muted : Tones.of(root.net.status-tone);
+                        }
+                    }
+                    Text {
+                        text: root.net.status;
+                        color: root.net.status-tone == Tone.neutral ? Theme.card-text : Tones.of(root.net.status-tone);
+                        font-size: Type.item;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
+                status-ta := TouchArea { }
+                HoverTip {
+                    text: root.net.explain;
+                    hovered: status-ta.has-hover;
+                }
+            }
+            Text {
+                width: Cols.speed;
+                text: root.net.speed;
+                color: Theme.text;
+                font-size: Type.item;
+                font-weight: Type.medium;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+            Text {
+                width: Cols.bytes;
+                text: root.net.bytes;
+                color: Theme.card-text;
+                font-size: Type.item;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+            HorizontalLayout {
+                width: Cols.share;
+                spacing: 8px;
+                padding-left: 16px;
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Rectangle {
+                        height: 4px;
+                        border-radius: 2px;
+                        background: Theme.track;
+                        Rectangle {
+                            x: 0;
+                            width: parent.width * root.net.share;
+                            border-radius: 2px;
+                            background: Theme.net(root.net.color);
+                            animate width { duration: Motion.expand; }
+                        }
+                    }
+                }
+                Text {
+                    width: 34px;
+                    text: root.net.share-text;
+                    color: Theme.card-text;
+                    font-size: Type.caption;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+            Text {
+                width: Cols.retries;
+                text: root.net.retries;
+                color: root.net.retries > 0 ? Theme.warning : Theme.muted;
+                font-size: Type.item;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+            VerticalLayout {
+                alignment: center;
+                width: Cols.toggle;
+                IconButton {
+                    size: 30px;
+                    icon: root.net.expanded ? Icons.chevron-down : Icons.chevron-right;
+                    tooltip: root.net.expanded ? "Hide streams" : "Show streams";
+                    enabled: root.net.stream-count > 0 || root.net.expanded;
+                    clicked => {
+                        App.expand-network(root.net.id);
+                    }
+                }
+            }
+        }
+
+        // What a problem status means, in words, right where it shows.
+        if root.problem && root.net.explain != "": HorizontalLayout {
+            padding-left: 96px;
+            padding-right: 16px;
+            padding-bottom: 12px;
+            Text {
+                text: root.net.explain;
+                color: Tones.of(root.net.status-tone);
+                font-size: Type.caption;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.net.expanded: VerticalLayout {
+            padding-left: 96px;
+            padding-right: 12px;
+            padding-bottom: 12px;
+            spacing: 6px;
+            for r in root.net.streams: HorizontalLayout {
+                spacing: 6px;
+                for c in r.cells: StreamPill {
+                    horizontal-stretch: 1;
+                    label: c.label;
+                    speed: c.speed;
+                    hedge: c.hedge;
+                    active: c.active;
+                    accent: Theme.net(root.net.color);
+                }
+            }
+        }
+    }
+}
+
+component NetworkTable {
+    Panel {
+        VerticalLayout {
+            padding: 8px;
+            padding-top: 4px;
+            HorizontalLayout {
+                height: 34px;
+                padding-left: 12px;
+                padding-right: 6px;
+                spacing: 12px;
+                Rectangle {
+                    width: 18px;
+                }
+                Label {
+                    text: "Network";
+                    horizontal-stretch: 1;
+                }
+                Label {
+                    width: Cols.status;
+                    text: "Status";
+                }
+                Label {
+                    width: Cols.speed;
+                    text: "Speed";
+                    horizontal-alignment: right;
+                }
+                Label {
+                    width: Cols.bytes;
+                    text: "Downloaded";
+                    horizontal-alignment: right;
+                }
+                Label {
+                    width: Cols.share;
+                    text: "Share";
+                    horizontal-alignment: right;
+                }
+                Label {
+                    width: Cols.retries;
+                    text: "Retries";
+                    horizontal-alignment: right;
+                }
+                Rectangle {
+                    width: Cols.toggle;
+                }
+            }
+            VerticalLayout {
+                spacing: 2px;
+                for n in App.detail-nets: NetworkRow {
+                    net: n;
+                }
+            }
+        }
+    }
+}
+
+// The line of actions at the top of an open card: where it is, and what can be done.
+component ActionBar {
+    in property <string> info;
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: root.info;
+            color: Theme.muted;
+            font-size: Type.caption;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        @children
+    }
+}
+
+component RunningBody {
+    VerticalLayout {
+        spacing: 12px;
+        ActionBar {
+            info: App.detail.footer;
+            Button {
+                compact: true;
+                icon: App.detail.paused ? Icons.play : Icons.pause;
+                text: App.detail.paused ? "Resume" : "Pause";
+                clicked => {
+                    App.detail-action(App.detail.paused ? "resume" : "pause");
+                }
+            }
+            Button {
+                compact: true;
+                kind: ButtonKind.quiet-danger;
+                text: "Cancel";
+                tooltip: "Stop and delete what was downloaded";
+                clicked => {
+                    App.detail-action("cancel");
+                }
+            }
+            IconButton {
+                size: 30px;
+                icon: Icons.folder;
+                tooltip: "Show in folder";
+                clicked => {
+                    App.detail-action("reveal");
+                }
+            }
+            IconButton {
+                size: 30px;
+                icon: Icons.link;
+                tooltip: "Copy link";
+                clicked => {
+                    App.detail-action("copy-link");
+                }
+            }
+        }
+
+        // How the speed is made, the speed, and the speed over time.
+        HorizontalLayout {
+            spacing: 12px;
+            height: 204px;
+            Panel {
+                horizontal-stretch: 0;
+                HorizontalLayout {
+                    padding: 20px;
+                    spacing: 24px;
+                    FlowDiagram {
+                        width: 236px;
+                        nets: App.detail-nets;
+                        flow-top: App.detail.flow-top;
+                        flow-bottom: App.detail.flow-bottom;
+                    }
+                    VerticalLayout {
+                        width: 220px;
+                        alignment: center;
+                        spacing: 4px;
+                        Label {
+                            text: App.detail.paused ? "Paused" : App.detail.queued ? "Waiting for a turn" : "Total speed";
+                        }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            Text {
+                                text: App.detail.speed-value;
+                                color: App.detail.paused || App.detail.queued ? Theme.muted : Theme.text;
+                                font-size: Type.hero;
+                                font-weight: Type.medium;
+                                letter-spacing: -1px;
+                            }
+                            VerticalLayout {
+                                alignment: end;
+                                padding-bottom: 9px;
+                                Text {
+                                    text: App.detail.speed-unit;
+                                    color: Theme.muted;
+                                    font-size: Type.body;
+                                }
+                            }
+                        }
+                        Text {
+                            text: "Average " + App.detail.avg + "  ·  Peak " + App.detail.peak;
+                            color: Theme.card-text;
+                            font-size: Type.caption;
+                        }
+                        Rectangle {
+                            height: 8px;
+                        }
+                        if App.detail.multiplier != "": HorizontalLayout {
+                            alignment: start;
+                            Rectangle {
+                                height: 28px;
+                                border-radius: 14px;
+                                background: Theme.card;
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 12px;
+                                    spacing: 6px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Icon {
+                                            source: Icons.bolt;
+                                            width: 13px;
+                                            height: 13px;
+                                            tint: Theme.text;
+                                        }
+                                    }
+                                    Text {
+                                        text: App.detail.multiplier;
+                                        color: Theme.text;
+                                        font-size: Type.item;
+                                        font-weight: Type.medium;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: App.detail.multiplier-text;
+                                        color: Theme.card-text;
+                                        font-size: Type.caption;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Panel {
+                horizontal-stretch: 1;
+                HorizontalLayout {
+                    padding: 20px;
+                    ThroughputChart {
+                        caption: App.detail.chart-caption;
+                        series: App.detail-chart;
+                        max-label: App.detail.chart-max;
+                        mid-label: App.detail.chart-mid;
+                    }
+                }
+            }
+        }
+
+        if App.detail.disk-limited: Notice {
+            tone: Tone.warning;
+            icon: Icons.alert;
+            title: "The disk is holding this download back";
+            body: "Most streams are waiting for their data to be written. A faster drive, or fewer downloads at once, would let the networks run at full speed.";
+        }
+
+        // Every block of the file.
+        Panel {
+            VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                HorizontalLayout {
+                    Label {
+                        text: "Blocks";
+                    }
+                    Rectangle {
+                        width: 16px;
+                    }
+                    Legend {
+                        horizontal-stretch: 1;
+                    }
+                    Text {
+                        text: App.detail.block-summary;
+                        color: Theme.muted;
+                        font-size: Type.caption;
+                        vertical-alignment: center;
+                    }
+                }
+                grid := BlockGrid {
+                    source: App.detail.blocks;
+                    grid-w: App.detail.grid-w;
+                    grid-h: App.detail.grid-h;
+                    cols: App.detail.grid-cols;
+                    pitch: App.detail.grid-pitch;
+                }
+                Text {
+                    height: 16px;
+                    text: grid.readout != "" ? grid.readout : "Each cell is one block, coloured by the network that delivered most of it. Hover one for details.";
+                    color: grid.readout != "" ? Theme.text : Theme.muted;
+                    font-size: Type.caption;
+                    overflow: elide;
+                }
+            }
+        }
+
+        NetworkTable { }
+    }
+}
+
+component CompleteBody {
+    VerticalLayout {
+        spacing: 12px;
+        ActionBar {
+            info: App.detail.footer;
+            Button {
+                compact: true;
+                kind: ButtonKind.quiet-danger;
+                icon: Icons.trash;
+                text: "Remove";
+                clicked => {
+                    App.detail-action("remove");
+                }
+            }
+            Button {
+                compact: true;
+                icon: Icons.folder;
+                text: "Show in folder";
+                enabled: !App.detail.missing;
+                clicked => {
+                    App.detail-action("reveal");
+                }
+            }
+            Button {
+                compact: true;
+                kind: ButtonKind.primary;
+                icon: Icons.open;
+                text: "Open";
+                enabled: !App.detail.missing;
+                clicked => {
+                    App.detail-action("open");
+                }
+            }
+        }
+
+        if App.detail.missing: Notice {
+            tone: Tone.warning;
+            icon: Icons.alert;
+            title: "The file is no longer where it was saved";
+            body: "It was moved, renamed or deleted after the download finished.";
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            Panel {
+                horizontal-stretch: 0;
+                min-width: 200px;
+                VerticalLayout {
+                    padding: 18px;
+                    alignment: center;
+                    spacing: 2px;
+                    Label {
+                        text: "Average speed";
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        Text {
+                            text: App.detail.speed-value;
+                            color: Theme.text;
+                            font-size: 36px;
+                            font-weight: Type.medium;
+                            letter-spacing: -0.8px;
+                        }
+                        VerticalLayout {
+                            alignment: end;
+                            padding-bottom: 7px;
+                            Text {
+                                text: App.detail.speed-unit;
+                                color: Theme.muted;
+                                font-size: Type.control;
+                            }
+                        }
+                    }
+                }
+            }
+            for s in App.detail.stats: Panel {
+                horizontal-stretch: 1;
+                VerticalLayout {
+                    padding: 18px;
+                    alignment: center;
+                    spacing: 6px;
+                    Label {
+                        text: s.label;
+                    }
+                    Text {
+                        text: s.value;
+                        color: Theme.text;
+                        font-size: Type.h3;
+                        font-weight: Type.medium;
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            if App.detail.has-chart: Panel {
+                horizontal-stretch: 3;
+                height: 220px;
+                HorizontalLayout {
+                    padding: 20px;
+                    ThroughputChart {
+                        caption: App.detail.chart-caption;
+                        series: App.detail-chart;
+                        max-label: App.detail.chart-max;
+                        mid-label: App.detail.chart-mid;
+                    }
+                }
+            }
+            Panel {
+                horizontal-stretch: 2;
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 14px;
+                    alignment: start;
+                    Label {
+                        text: "Contribution by network";
+                    }
+                    ShareBar {
+                        segments: App.detail.segments;
+                    }
+                    VerticalLayout {
+                        for n in App.detail-nets: HorizontalLayout {
+                            height: 32px;
+                            spacing: 10px;
+                            VerticalLayout {
+                                alignment: center;
+                                Dot {
+                                    color: Theme.net(n.color);
+                                    size: 9px;
+                                }
+                            }
+                            Text {
+                                text: n.name;
+                                color: Theme.text;
+                                font-size: Type.item;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: n.bytes;
+                                color: Theme.muted;
+                                font-size: Type.item;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                width: 44px;
+                                text: n.share-text;
+                                color: Theme.text;
+                                font-size: Type.item;
+                                font-weight: Type.medium;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component FailedBody {
+    VerticalLayout {
+        spacing: 12px;
+        Notice {
+            tone: Tone.danger;
+            icon: Icons.alert-circle;
+            title: "This download stopped";
+            body: App.detail.error;
+        }
+        Panel {
+            VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                HorizontalLayout {
+                    Text {
+                        text: App.detail.sizes;
+                        color: Theme.card-text;
+                        font-size: Type.item;
+                        horizontal-stretch: 1;
+                    }
+                    Text {
+                        text: App.detail.resumable ? "Kept — resumes where it stopped" : "Its progress can't be kept";
+                        color: App.detail.resumable ? Theme.muted : Theme.warning;
+                        font-size: Type.caption;
+                    }
+                }
+                ProgressBar {
+                    thickness: 6px;
+                    segments: App.detail.segments;
+                    progress: App.detail.progress;
+                    muted: true;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    if App.detail.resumable: Button {
+                        compact: true;
+                        kind: ButtonKind.primary;
+                        icon: Icons.retry;
+                        text: "Resume";
+                        clicked => {
+                            App.detail-action("resume");
+                        }
+                    }
+                    Button {
+                        compact: true;
+                        icon: Icons.copy;
+                        text: "Copy link";
+                        clicked => {
+                            App.detail-action("copy-link");
+                        }
+                    }
+                    Button {
+                        compact: true;
+                        kind: ButtonKind.quiet-danger;
+                        icon: Icons.trash;
+                        text: "Remove";
+                        clicked => {
+                            App.detail-action("remove");
+                        }
+                    }
+                }
+            }
+        }
+        Panel {
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+                Text {
+                    text: "Replace the link";
+                    color: Theme.text;
+                    font-size: Type.body;
+                    font-weight: Type.medium;
+                }
+                Text {
+                    text: "Links from many sites expire. Get a fresh link to the same file from where you found it, paste it here, and the download carries on from where it stopped.";
+                    color: Theme.card-text;
+                    font-size: Type.item;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    TextField {
+                        icon: Icons.link;
+                        placeholder: "https://";
+                        text <=> App.relink-url;
+                        invalid: App.relink-error != "";
+                        accepted => {
+                            App.relink();
+                        }
+                    }
+                    Button {
+                        kind: ButtonKind.primary;
+                        text: "Use this link";
+                        enabled: App.relink-url != "";
+                        clicked => {
+                            App.relink();
+                        }
+                    }
+                }
+                if App.relink-error != "": Text {
+                    text: App.relink-error;
+                    color: Theme.danger;
+                    font-size: Type.caption;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: "Current link: " + App.detail.url;
+                    color: Theme.muted;
+                    font-size: Type.caption;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
+
+export component ExpandedBody {
+    VerticalLayout {
+        if App.detail.kind == DetailKind.running: RunningBody { }
+        if App.detail.kind == DetailKind.complete: CompleteBody { }
+        if App.detail.kind == DetailKind.failed: FailedBody { }
+    }
+}

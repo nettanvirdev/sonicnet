@@ -1,0 +1,548 @@
+// The home page: every download as a card, grouped by state. A card opens in place to show
+// everything about its download; only one is open at a time.
+
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons, Logo } from "../icons.slint";
+import { Button, ButtonKind, IconButton, LinkButton, HoverTip } from "../components/button.slint";
+import { Checkbox, Segmented } from "../components/inputs.slint";
+import { Card, Label, Dot, ExtTile, ProgressBar, ScrollArea, Tones } from "../components/display.slint";
+import { ExpandedBody } from "expanded.slint";
+import { App, Row, RowState, Tone } from "../types.slint";
+
+component DownloadCard {
+    in property <Row> item;
+    in property <bool> selecting;
+
+    property <bool> open: item.expanded;
+    // The body is built for the one card Rust holds content for, and stays while it closes.
+    property <bool> has-body: App.body-id == item.id;
+    // Set by the network pill, which sits inside an `if` and so can't be named from here.
+    property <bool> pill-hovered;
+    property <bool> hovered: head-ta.has-hover || check.hovered || action.hovered || chevron.hovered || pill-hovered;
+    property <bool> show-check: item.selected || selecting || (hovered && !open);
+    property <bool> unfinished: item.state != RowState.finished && item.state != RowState.failed;
+
+    accessible-role: list-item;
+    accessible-label: item.name + ", " + item.detail;
+    accessible-item-selected: item.selected;
+    accessible-expandable: true;
+    accessible-expanded: open;
+    accessible-action-default => {
+        App.row-open(item.id);
+    }
+
+    // Once closed, let go of the body so a shut card costs nothing.
+    Timer {
+        interval: Motion.expand + 60ms;
+        running: !root.open && root.has-body;
+        triggered => {
+            App.body-id = "";
+        }
+    }
+
+    Rectangle {
+        border-radius: Radius.card;
+        background: Theme.card;
+        clip: true;
+
+        // The header's wash: hover, the keyboard's place, or selection.
+        Rectangle {
+            height: 76px;
+            y: 0;
+            background: root.item.selected ? Theme.selected : (root.hovered || root.item.focused) && !root.open ? Theme.hover : transparent;
+            animate background { duration: Motion.fast; }
+        }
+
+        VerticalLayout {
+            head := Rectangle {
+                height: 76px;
+                head-ta := TouchArea {
+                    mouse-cursor: pointer;
+                    pointer-event(e) => {
+                        if (e.kind == PointerEventKind.down && e.button == PointerEventButton.left) {
+                            App.row-pointer(root.item.id, e.modifiers.control, e.modifiers.shift);
+                        }
+                        if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right) {
+                            App.row-menu(root.item.id, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    padding-left: 18px;
+                    padding-right: 14px;
+                    spacing: 16px;
+
+                    // The file's tile, which turns into its checkbox under the pointer or while
+                    // selecting: selection is one hover away without a column of empty boxes.
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 40px;
+                            height: 40px;
+                            ExtTile {
+                                ext: root.item.ext;
+                                tone: root.item.state == RowState.failed ? Tone.danger : Tone.neutral;
+                                done: root.item.state == RowState.finished;
+                                opacity: root.show-check ? 0 : 1;
+                                animate opacity { duration: Motion.fast; }
+                            }
+                            Rectangle {
+                                opacity: root.show-check ? 1 : 0;
+                                animate opacity { duration: Motion.fast; }
+                                check := Checkbox {
+                                    checked: root.item.selected;
+                                    accessible-label: "Select " + root.item.name;
+                                    toggled => {
+                                        App.row-pointer(root.item.id, true, false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        horizontal-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 10px;
+                            Text {
+                                text: root.item.name;
+                                color: Theme.text;
+                                font-size: Type.body;
+                                font-weight: Type.medium;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                        if root.unfinished: ProgressBar {
+                            thickness: 4px;
+                            segments: root.item.segments;
+                            progress: root.item.progress;
+                            active: root.item.state == RowState.downloading;
+                            muted: root.item.state != RowState.downloading;
+                        }
+                        Text {
+                            text: root.item.detail;
+                            color: root.item.detail-tone == Tone.neutral ? Theme.muted : Tones.of(root.item.detail-tone);
+                            font-size: Type.caption;
+                            overflow: elide;
+                        }
+                    }
+
+                    // Which networks carry it, as their icons in their colours, centred beside the speed; the
+                    // tooltip names each with its share.
+                    // A fixed column, so every card's progress bar ends at the same place whether or
+                    // not it shows networks.
+                    VerticalLayout {
+                        width: 112px;
+                        alignment: center;
+                        if root.item.nets.length > 0: HorizontalLayout {
+                            alignment: end;
+                            nets-pill := Rectangle {
+                                height: 22px;
+                                border-radius: 11px;
+                                background: Theme.field;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 6px;
+                                    for n in root.item.nets: VerticalLayout {
+                                        alignment: center;
+                                        Icon {
+                                            source: Icons.kind(n.kind);
+                                            tint: Theme.net(n.color);
+                                            width: 14px;
+                                            height: 14px;
+                                        }
+                                    }
+                                }
+                                pill-ta := TouchArea {
+                                    changed has-hover => {
+                                        root.pill-hovered = self.has-hover;
+                                    }
+                                }
+                                HoverTip {
+                                    hovered: pill-ta.has-hover;
+                                    text: root.item.nets-tip;
+                                }
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 3px;
+                        width: 104px;
+                        Text {
+                            text: root.item.speed;
+                            color: Theme.text;
+                            font-size: Type.control;
+                            font-weight: Type.medium;
+                            horizontal-alignment: right;
+                            visible: root.item.speed != "";
+                        }
+                        Text {
+                            text: root.item.eta;
+                            color: Theme.muted;
+                            font-size: Type.stamp;
+                            horizontal-alignment: right;
+                        }
+                    }
+
+                    // The quick action, shown under the pointer.
+                    VerticalLayout {
+                        alignment: center;
+                        action := IconButton {
+                            opacity: root.hovered || root.item.focused ? 1 : 0;
+                            animate opacity { duration: Motion.fast; }
+                            icon: root.item.state == RowState.downloading || root.item.state == RowState.queued ? Icons.pause
+                                : root.item.state == RowState.paused ? Icons.play
+                                : root.item.state == RowState.failed ? Icons.retry
+                                : Icons.folder;
+                            tooltip: root.item.state == RowState.downloading || root.item.state == RowState.queued ? "Pause"
+                                : root.item.state == RowState.paused ? "Resume"
+                                : root.item.state == RowState.failed ? "Try again"
+                                : "Show in folder";
+                            clicked => {
+                                App.row-action(root.item.id);
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        chevron := IconButton {
+                            icon: root.open ? Icons.chevron-up : Icons.chevron-down;
+                            tooltip: root.open ? "Close" : "Open";
+                            tint: Theme.muted;
+                            clicked => {
+                                App.row-open(root.item.id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // The body: as tall as its content while open, nothing while shut, sliding between.
+            Rectangle {
+                height: root.open ? body.preferred-height : 0px;
+                clip: true;
+                animate height { duration: Motion.expand; easing: cubic-bezier(0.32, 0.72, 0, 1); }
+                body := VerticalLayout {
+                    y: 0;
+                    height: self.preferred-height;
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-bottom: 16px;
+                    padding-top: 4px;
+                    opacity: root.open ? 1 : 0;
+                    animate opacity { duration: Motion.base; }
+                    if root.has-body: ExpandedBody { }
+                }
+            }
+        }
+    }
+}
+
+// The empty page's picture: your connections (in their colours) flowing into SonicNet's mark,
+// which is what the app does. Flat shapes from the theme, so it follows light and dark.
+component EmptyArt {
+    width: 320px;
+    height: 200px;
+    property <[{x: length, kind: int}]> tiles: [
+        { x: 32px, kind: 0 },
+        { x: 132px, kind: 1 },
+        { x: 232px, kind: 2 },
+    ];
+    // The streams, as filled bands from each tile down into the mark.
+    for i in 3: Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: 320;
+        viewbox-height: 200;
+        fill: Theme.net(i).with-alpha(Theme.dark ? 0.55 : 0.45);
+        commands: i == 0 ? "M58 64C58 101 146 97 146 128L150 128C150 95 62 99 62 64Z"
+            : i == 1 ? "M158 64L162 64L162 128L158 128Z"
+            : "M262 64C262 101 174 97 174 128L170 128C170 95 258 99 258 64Z";
+    }
+    for t[i] in root.tiles: Rectangle {
+        x: t.x;
+        y: 0px;
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        background: Theme.net(i).with-alpha(Theme.dark ? 0.2 : 0.14);
+        Icon {
+            source: Icons.kind(t.kind);
+            tint: Theme.net(i);
+            width: 26px;
+            height: 26px;
+        }
+    }
+    Logo {
+        x: 124px;
+        y: 124px;
+        size: 76px;
+    }
+}
+
+// Shown when nothing is listed: what SonicNet does, and how to start.
+component EmptyState {
+    VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            Card {
+                width: 520px;
+                VerticalLayout {
+                    padding: 40px;
+                    padding-bottom: 36px;
+                    spacing: 0px;
+                    HorizontalLayout {
+                        alignment: center;
+                        EmptyArt { }
+                    }
+                    Rectangle {
+                        height: 28px;
+                    }
+                    Text {
+                        text: App.no-networks ? "No networks connected" : "Nothing downloading yet";
+                        color: Theme.text;
+                        font-size: Type.h2;
+                        font-weight: Type.medium;
+                        horizontal-alignment: center;
+                    }
+                    Rectangle {
+                        height: 8px;
+                    }
+                    Text {
+                        text: App.no-networks
+                            ? "Join a Wi-Fi network, plug in Ethernet or tether your phone over USB, and SonicNet will find it."
+                            : "Paste a link and SonicNet fetches the file over every connection you have at once.";
+                        color: Theme.card-text;
+                        font-size: Type.control;
+                        wrap: word-wrap;
+                        horizontal-alignment: center;
+                    }
+                    Rectangle {
+                        height: 24px;
+                    }
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 10px;
+                        Button {
+                            kind: ButtonKind.primary;
+                            icon: Icons.plus;
+                            text: "New download";
+                            hint: "Ctrl+N";
+                            clicked => {
+                                App.new-download();
+                            }
+                        }
+                        Button {
+                            icon: Icons.paste;
+                            text: "Paste link";
+                            hint: "Ctrl+V";
+                            clicked => {
+                                App.paste-link();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component ListScreen {
+    property <bool> selecting: App.selected-count > 0;
+
+    VerticalLayout {
+        // Toolbar: filters, or what can be done with the selection.
+        Rectangle {
+            height: 60px;
+            HorizontalLayout {
+                padding-left: 24px;
+                padding-right: 24px;
+                spacing: 12px;
+
+                if !root.selecting && !App.empty: VerticalLayout {
+                    alignment: center;
+                    Segmented {
+                        compact: true;
+                        options: App.filter-labels;
+                        selected: App.filter;
+                        changed(i) => {
+                            App.set-filter(i);
+                        }
+                    }
+                }
+                if !root.selecting && !App.empty: Text {
+                    text: App.summary;
+                    color: Theme.muted;
+                    font-size: Type.caption;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                if root.selecting: VerticalLayout {
+                    alignment: center;
+                    IconButton {
+                        icon: Icons.x;
+                        tooltip: "Clear selection (Esc)";
+                        clicked => {
+                            App.clear-selection();
+                        }
+                    }
+                }
+                if root.selecting: Text {
+                    text: App.selected-count + " selected";
+                    color: Theme.text;
+                    font-size: Type.control;
+                    font-weight: Type.medium;
+                    vertical-alignment: center;
+                }
+                if root.selecting: VerticalLayout {
+                    alignment: center;
+                    LinkButton {
+                        text: "Select all";
+                        clicked => {
+                            App.select-all();
+                        }
+                    }
+                }
+                if root.selecting: Rectangle {
+                    horizontal-stretch: 1;
+                }
+                if root.selecting && App.sel-can-pause: VerticalLayout {
+                    alignment: center;
+                    Button {
+                        compact: true;
+                        icon: Icons.pause;
+                        text: "Pause";
+                        clicked => {
+                            App.bulk("pause");
+                        }
+                    }
+                }
+                if root.selecting && App.sel-can-resume: VerticalLayout {
+                    alignment: center;
+                    Button {
+                        compact: true;
+                        icon: Icons.play;
+                        text: "Resume";
+                        clicked => {
+                            App.bulk("resume");
+                        }
+                    }
+                }
+                if root.selecting: VerticalLayout {
+                    alignment: center;
+                    Button {
+                        compact: true;
+                        kind: ButtonKind.danger;
+                        icon: Icons.trash;
+                        text: "Remove";
+                        hint: "Del";
+                        clicked => {
+                            App.bulk("remove");
+                        }
+                    }
+                }
+            }
+        }
+
+        if App.empty: EmptyState {
+            vertical-stretch: 1;
+        }
+
+        if !App.empty && App.filtered-empty: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: center;
+            spacing: 12px;
+            Text {
+                text: "Nothing here";
+                color: Theme.text;
+                font-size: Type.title;
+                font-weight: Type.medium;
+                horizontal-alignment: center;
+            }
+            HorizontalLayout {
+                alignment: center;
+                Button {
+                    text: "Show all downloads";
+                    clicked => {
+                        App.set-filter(0);
+                    }
+                }
+            }
+        }
+
+        if !App.empty && !App.filtered-empty: ScrollArea {
+            vertical-stretch: 1;
+            VerticalLayout {
+                alignment: start;
+                padding-left: 24px;
+                padding-right: 24px;
+                padding-bottom: 28px;
+                for group[g] in App.groups: VerticalLayout {
+                    // An empty group takes no room at all.
+                    if group.count > 0: Rectangle {
+                        height: 44px;
+                        header-ta := TouchArea { }
+                        // The heading lines up with the cards' tiles; selecting the whole group sits
+                        // at the right, where it never shifts the heading.
+                        HorizontalLayout {
+                            padding-left: 18px;
+                            padding-right: 14px;
+                            padding-top: 12px;
+                            spacing: 8px;
+                            Text {
+                                text: group.title;
+                                color: Theme.card-text;
+                                font-size: Type.item;
+                                font-weight: Type.medium;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: group.count;
+                                color: Theme.muted;
+                                font-size: Type.item;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                            }
+                            if group.action != "": VerticalLayout {
+                                alignment: center;
+                                LinkButton {
+                                    text: group.action;
+                                    clicked => {
+                                        App.group-action(g);
+                                    }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Checkbox {
+                                    checked: group.checked;
+                                    partial: group.partial;
+                                    accessible-label: "Select every " + group.title + " download";
+                                    opacity: root.selecting || header-ta.has-hover || self.hovered ? 1 : 0;
+                                    toggled(on) => {
+                                        App.select-group(g, on);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if group.count > 0: VerticalLayout {
+                        spacing: 8px;
+                        for row in group.rows: DownloadCard {
+                            item: row;
+                            selecting: root.selecting;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

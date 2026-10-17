@@ -1,0 +1,212 @@
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+import { Seg, Tone } from "../types.slint";
+
+// The main grouping element: a lighter surface on the canvas, rounded, nothing around it.
+export component Card inherits Rectangle {
+    background: Theme.card;
+    border-radius: Radius.card;
+}
+
+// A recessed group inside a card.
+export component Panel inherits Rectangle {
+    background: Theme.sunken;
+    border-radius: Radius.panel;
+}
+
+// A small heading over a section or column.
+export component Label inherits Text {
+    color: Theme.muted;
+    font-size: Type.caption;
+    font-weight: Type.medium;
+    vertical-alignment: center;
+}
+
+export global Tones {
+    public pure function of(tone: Tone) -> color {
+        if (tone == Tone.success) {
+            return Theme.success;
+        }
+        if (tone == Tone.warning) {
+            return Theme.warning;
+        }
+        if (tone == Tone.danger) {
+            return Theme.danger;
+        }
+        return Theme.card-text;
+    }
+}
+
+// A tinted pill of text.
+export component Badge {
+    in property <string> text;
+    in property <Tone> tone;
+    property <color> c: Tones.of(tone);
+
+    height: 22px;
+    horizontal-stretch: 0;
+    Rectangle {
+        border-radius: 11px;
+        background: root.tone == Tone.neutral ? Theme.secondary : root.c.with-alpha(Theme.dark ? 0.16 : 0.11);
+    }
+    HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 9px;
+        Text {
+            text: root.text;
+            color: root.tone == Tone.neutral ? Theme.card-text : root.c;
+            font-size: Type.caption;
+            font-weight: Type.medium;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component Dot {
+    in property <color> color;
+    in property <length> size: 8px;
+    width: size;
+    height: size;
+    Rectangle {
+        border-radius: root.size / 2;
+        background: root.color;
+    }
+}
+
+// The file-type tile: the extension on a recessed square.
+export component ExtTile {
+    in property <string> ext;
+    in property <length> size: 40px;
+    in property <Tone> tone: Tone.neutral;
+    in property <bool> done;
+
+    width: size;
+    height: size;
+    Rectangle {
+        border-radius: Radius.panel - 2px;
+        background: root.tone == Tone.danger ? Theme.danger.with-alpha(0.1) : root.done ? Theme.success.with-alpha(Theme.dark ? 0.16 : 0.12) : Theme.sunken;
+    }
+    if !root.done: Text {
+        text: root.ext;
+        font-size: root.ext.character-count > 3 ? Type.meta : Type.stamp;
+        font-weight: Type.medium;
+        color: root.tone == Tone.danger ? Theme.danger : Theme.card-text;
+    }
+    if root.done: Icon {
+        width: root.size * 0.45;
+        height: self.width;
+        source: Icons.check;
+        tint: Theme.success;
+    }
+}
+
+export component Spinner {
+    in property <color> color: Theme.card-text;
+    in property <length> size: 14px;
+    width: size;
+    height: size;
+    Image {
+        width: 100%;
+        height: 100%;
+        source: Icons.spinner;
+        colorize: root.color;
+        transform-rotation: Math.mod(animation-tick() / 1ms, 900) / 900 * 360deg;
+    }
+}
+
+// Progress, coloured by the network that delivered each part.
+export component ProgressBar {
+    in property <[Seg]> segments;
+    // 0 to 1; negative when unknown.
+    in property <float> progress;
+    in property <bool> active;
+    in property <color> fill: Theme.primary;
+    in property <bool> muted;
+    in property <length> thickness: 6px;
+
+    height: thickness;
+    Rectangle {
+        border-radius: root.thickness / 2;
+        background: Theme.track;
+        clip: true;
+
+        if root.segments.length == 0 && root.progress >= 0: Rectangle {
+            x: 0;
+            width: parent.width * root.progress;
+            background: root.muted ? Theme.muted : root.fill;
+            animate width { duration: Motion.expand; }
+        }
+        for seg in root.segments: Rectangle {
+            x: parent.width * seg.start;
+            width: parent.width * seg.share;
+            background: root.muted ? Theme.muted.with-alpha(0.6) : Theme.net(seg.color);
+            animate width, x { duration: Motion.expand; }
+        }
+        // Unknown size: a band sweeps across while bytes arrive.
+        if root.progress < 0 && root.active: Rectangle {
+            width: parent.width * 0.3;
+            x: (Math.mod(animation-tick() / 1ms, 1400) / 1400) * (parent.width * 1.3) - self.width;
+            background: root.fill;
+            border-radius: root.thickness / 2;
+        }
+    }
+}
+
+// A tinted block of context: an icon, a title and a sentence.
+export component Notice {
+    in property <Tone> tone: Tone.warning;
+    in property <string> title;
+    in property <string> body;
+    in property <image> icon: Icons.info;
+    property <color> c: Tones.of(tone);
+
+    Rectangle {
+        border-radius: Radius.panel;
+        background: root.c.with-alpha(Theme.dark ? 0.12 : 0.08);
+    }
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: start;
+            padding-top: 1px;
+            Icon {
+                source: root.icon;
+                tint: root.c;
+                width: 17px;
+                height: 17px;
+            }
+        }
+        VerticalLayout {
+            spacing: 3px;
+            horizontal-stretch: 1;
+            if root.title != "": Text {
+                text: root.title;
+                color: root.tone == Tone.danger ? Theme.danger : Theme.text;
+                font-size: Type.control;
+                font-weight: Type.medium;
+                wrap: word-wrap;
+            }
+            if root.body != "": Text {
+                text: root.body;
+                color: Theme.card-text;
+                font-size: Type.item;
+                wrap: word-wrap;
+            }
+        }
+        @children
+    }
+}
+
+// A scrolling area with no visible scrollbar (the wheel, touchpad and keyboard still scroll).
+export component ScrollArea {
+    in-out property <length> viewport-y <=> fl.content-y;
+    out property <length> viewport-height: fl.content-height;
+
+    fl := Flickable {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+        @children
+    }
+}

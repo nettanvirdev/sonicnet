@@ -1,0 +1,16 @@
+/target
+/target-*
+*.sonic
+.DS_Store
+# Wintun's signed DLL and licence, copied from the verified official zip (docs/system-mode.md).
+/vendor/wintun/
+
+# Local junk that must never be published.
+.claude/
+.vscode/
+.idea/
+.env
+.env.*
+*.log
+node_modules/
+Thumbs.db

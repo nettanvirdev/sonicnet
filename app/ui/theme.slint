@@ -1,0 +1,116 @@
+// Design tokens: every colour, size and radius the UI uses comes from here.
+//
+// The language is borderless: no strokes, hairlines, shadows or gradients. Things separate only
+// by surface contrast and space. Surfaces climb a ladder (rail < canvas < card < popover), and
+// the further a surface is from the canvas the lighter it is, in both themes. The UI itself is
+// neutral grey with a black/white primary; colour is kept for networks and status.
+
+import { Palette } from "std-widgets.slint";
+
+// A network colour. `id` is what settings persist (`NetworkPreference::color_id`).
+export struct Swatch {
+    id: string,
+    label: string,
+    light: color,
+    dark: color,
+}
+
+export global Theme {
+    // 0 = follow Windows, 1 = light, 2 = dark (mirrors `AppSettings::theme`).
+    in property <int> mode: 0;
+    // Palette follows the OS until something overrides it, and nothing here ever does.
+    out property <bool> dark: mode == 2 || (mode == 0 && Palette.color-scheme == ColorScheme.dark);
+
+    // The surface ladder.
+    out property <color> rail: dark ? #0d0d0d : #e8e8e8;
+    out property <color> canvas: dark ? #151515 : #f1f1f1;
+    out property <color> card: dark ? #1c1c1c : #f8f8f8;
+    out property <color> popover: dark ? #292929 : #ffffff;
+    // A recessed area inside a card: grouped sub-sections, footers, inner panels.
+    out property <color> sunken: dark ? #ffffff08 : #00000011;
+    out property <color> secondary: dark ? #262626 : #ebebeb;
+    out property <color> scrim: dark ? #00000099 : #00000073;
+
+    // Washes laid over a surface.
+    out property <color> hover: dark ? #ffffff14 : #0000000d;
+    out property <color> pressed: dark ? #ffffff1f : #00000017;
+    out property <color> selected: dark ? #ffffff17 : #00000012;
+    out property <color> field: dark ? #ffffff0d : #0000000d;
+    out property <color> field-hover: dark ? #ffffff14 : #00000014;
+    out property <color> field-focus: dark ? #ffffff17 : #00000017;
+    // A bar's empty part and a block not yet fetched.
+    out property <color> track: dark ? #2e2e2e : #e2e2e2;
+
+    // Text.
+    out property <color> text: dark ? #eeeeee : #000000;
+    out property <color> card-text: dark ? #cecece : #333333;
+    out property <color> muted: dark ? #8f8f8f : #9b9b9b;
+
+    // The primary action inverts with the theme, its text too.
+    out property <color> primary: dark ? #ffffff : #000000;
+    out property <color> on-primary: dark ? #000000 : #ffffff;
+
+    // Meaning. Red is only ever text or a tinted block, never a solid button.
+    out property <color> danger: dark ? #ff6467 : #e7000b;
+    out property <color> warning: dark ? #e8a33d : #b8730a;
+    out property <color> success: dark ? #2eb88a : #1f8f6a;
+
+    // Network colours: flat and a little muted, one hue each, legible on either card.
+    out property <[Swatch]> swatches: [
+        { id: "teal", label: "Teal", light: #2a9d8f, dark: #2eb88a },
+        { id: "blue", label: "Blue", light: #3d6fd6, dark: #2f6fe4 },
+        { id: "orange", label: "Orange", light: #f4a261, dark: #e88c30 },
+        { id: "violet", label: "Violet", light: #9b5ccf, dark: #af57db },
+        { id: "pink", label: "Pink", light: #d6457a, dark: #e23670 },
+        { id: "slate", label: "Slate", light: #264653, dark: #5b8fa8 },
+        { id: "sand", label: "Sand", light: #e9c46a, dark: #d9b450 },
+        { id: "coral", label: "Coral", light: #e76f51, dark: #e8735a },
+        { id: "olive", label: "Olive", light: #7f9a3c, dark: #93b34a },
+        { id: "sky", label: "Sky", light: #3a9fc4, dark: #38a9d6 },
+    ];
+    // The swatch each `NetworkKind` starts with (Wi-Fi, Ethernet, USB, Cellular, Bridge, Virtual,
+    // Other). Empty: no hue of its own, it takes the first free one.
+    out property <[string]> kind-swatch: ["teal", "blue", "orange", "violet", "", "", ""];
+
+    // The colour of swatch `index`; a negative index is "no network" (muted).
+    public pure function net(index: int) -> color {
+        if (index < 0 || index >= swatches.length) {
+            return muted;
+        }
+        return dark ? swatches[index].dark : swatches[index].light;
+    }
+}
+
+export global Radius {
+    out property <length> xxs: 2px;
+    out property <length> xs: 6px;
+    out property <length> control: 8px;
+    out property <length> panel: 12px;
+    out property <length> card: 16px;
+    out property <length> dialog: 16px;
+    out property <length> xl: 24px;
+    out property <length> pill: 999px;
+}
+
+// Two weights only, and a fixed scale.
+export global Type {
+    out property <string> family: "Segoe UI Variable Text";
+    out property <length> meta: 10px;
+    out property <length> stamp: 11px;
+    out property <length> caption: 12px;
+    out property <length> item: 13px;
+    out property <length> control: 14px;
+    out property <length> body: 15px;
+    out property <length> title: 16px;
+    out property <length> h3: 18px;
+    out property <length> h2: 20px;
+    out property <length> hero: 44px;
+    out property <int> regular: 400;
+    out property <int> medium: 500;
+}
+
+export global Motion {
+    out property <duration> fast: 100ms;
+    out property <duration> base: 180ms;
+    out property <duration> expand: 280ms;
+}

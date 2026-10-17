@@ -1,0 +1,19 @@
+{
+  "name": "sonicnet-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension that hands downloads to the SonicNet desktop app.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.5",
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

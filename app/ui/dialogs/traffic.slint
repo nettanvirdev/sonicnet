@@ -1,0 +1,285 @@
+// Networks: what every connection carries right now, System mode and SonicNet's downloads
+// together, with the last minute and the totals for this session and today.
+
+import { Theme, Radius, Type } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+import { Button, ButtonKind } from "../components/button.slint";
+import { Badge, Panel, Label, ScrollArea } from "../components/display.slint";
+import { Dialog, DialogFooter } from "../components/overlay.slint";
+import { ThroughputChart } from "../components/chart.slint";
+import { App, TrafficNet } from "../types.slint";
+
+// A legend swatch: the network's colour, full for System mode, lighter for downloads.
+component Key {
+    in property <color> color;
+    in property <string> text;
+    HorizontalLayout {
+        spacing: 6px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 10px;
+                height: 10px;
+                border-radius: 3px;
+                background: root.color;
+            }
+        }
+        Text {
+            text: root.text;
+            color: Theme.muted;
+            font-size: Type.caption;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// A figure with its label above it.
+component Figure {
+    in property <string> label;
+    in property <string> value;
+    in property <string> sub;
+    VerticalLayout {
+        spacing: 3px;
+        Label {
+            text: root.label;
+        }
+        Text {
+            text: root.value;
+            color: Theme.text;
+            font-size: Type.item;
+            font-weight: Type.medium;
+        }
+        if root.sub != "": Text {
+            text: root.sub;
+            color: Theme.muted;
+            font-size: Type.caption;
+        }
+    }
+}
+
+component NetworkCard {
+    in property <TrafficNet> net;
+
+    Panel {
+        VerticalLayout {
+            padding: 18px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 12px;
+                Rectangle {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: Radius.control;
+                    background: Theme.net(root.net.color).with-alpha(Theme.dark ? 0.18 : 0.14);
+                    Icon {
+                        source: Icons.kind(root.net.kind);
+                        tint: Theme.net(root.net.color);
+                        width: 17px;
+                        height: 17px;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    horizontal-stretch: 1;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: root.net.name;
+                            color: Theme.text;
+                            font-size: Type.control;
+                            font-weight: Type.medium;
+                            overflow: elide;
+                            horizontal-stretch: 0;
+                        }
+                        Badge {
+                            text: root.net.status;
+                            tone: root.net.status-tone;
+                        }
+                        Rectangle { }
+                    }
+                    Text {
+                        text: root.net.description;
+                        color: Theme.muted;
+                        font-size: Type.caption;
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    Text {
+                        text: root.net.down;
+                        color: root.net.busy ? Theme.text : Theme.muted;
+                        font-size: Type.title;
+                        font-weight: Type.medium;
+                        horizontal-alignment: right;
+                    }
+                    Text {
+                        text: root.net.up;
+                        color: Theme.muted;
+                        font-size: Type.caption;
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+            ThroughputChart {
+                height: 96px;
+                series: root.net.chart;
+                max-label: root.net.chart-max;
+                mid-label: root.net.chart-mid;
+                caption: "Last 60 s";
+            }
+            HorizontalLayout {
+                spacing: 20px;
+                Figure {
+                    horizontal-stretch: 1;
+                    label: "This session";
+                    value: root.net.session-system;
+                    sub: root.net.session-downloads;
+                }
+                Figure {
+                    horizontal-stretch: 1;
+                    label: "Today";
+                    value: root.net.today-system;
+                    sub: root.net.today-downloads;
+                }
+                Figure {
+                    horizontal-stretch: 1;
+                    label: "Open now";
+                    value: root.net.connections;
+                }
+            }
+            HorizontalLayout {
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Rectangle {
+                        height: 6px;
+                        border-radius: 3px;
+                        background: Theme.dark ? #ffffff1f : Theme.track;
+                        Rectangle {
+                            x: 0;
+                            width: parent.width * min(1, root.net.share);
+                            border-radius: 3px;
+                            background: Theme.net(root.net.color);
+                        }
+                    }
+                }
+                Text {
+                    text: root.net.share-text;
+                    color: Theme.card-text;
+                    font-size: Type.caption;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+export component TrafficDialog {
+    Dialog {
+        width: 100%;
+        height: 100%;
+        title: "Networks";
+        subtitle: "What each connection carries: System-wide traffic and SonicNet's downloads";
+        panel-width: 840px;
+        panel-height: 700px;
+        close => {
+            App.traffic-open = false;
+        }
+
+        HorizontalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-bottom: 14px;
+            spacing: 24px;
+            VerticalLayout {
+                spacing: 2px;
+                Label {
+                    text: "Coming in now";
+                }
+                Text {
+                    text: App.traffic-speed;
+                    color: Theme.text;
+                    font-size: Type.h2;
+                    font-weight: Type.medium;
+                }
+            }
+            VerticalLayout {
+                spacing: 2px;
+                Label {
+                    text: "Routed this session";
+                }
+                Text {
+                    text: App.traffic-session;
+                    color: Theme.text;
+                    font-size: Type.h2;
+                    font-weight: Type.medium;
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: end;
+                horizontal-stretch: 0;
+                spacing: 6px;
+                Key {
+                    color: Theme.card-text;
+                    text: "System-wide";
+                }
+                Key {
+                    color: Theme.card-text.with-alpha(0.4);
+                    text: "SonicNet downloads";
+                }
+            }
+        }
+
+        ScrollArea {
+            vertical-stretch: 1;
+            VerticalLayout {
+                alignment: start;
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-bottom: 16px;
+                spacing: 10px;
+                for net in App.traffic-nets: NetworkCard {
+                    net: net;
+                }
+                if App.traffic-nets.length == 0: Text {
+                    text: "No network is connected.";
+                    color: Theme.muted;
+                    font-size: Type.item;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        DialogFooter {
+            Text {
+                text: App.sys-label;
+                color: Theme.muted;
+                font-size: Type.caption;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            Button {
+                kind: ButtonKind.ghost;
+                text: "Network settings";
+                clicked => {
+                    App.traffic-open = false;
+                    App.open-settings(2);
+                }
+            }
+            Button {
+                kind: ButtonKind.primary;
+                text: "Done";
+                clicked => {
+                    App.traffic-open = false;
+                }
+            }
+        }
+    }
+}

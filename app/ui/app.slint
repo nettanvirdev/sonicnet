@@ -1,0 +1,458 @@
+// SonicNet's window: header, the downloads, the status bar, and everything that floats.
+
+import { Theme, Radius, Type, Motion } from "theme.slint";
+import { Icon, Icons, Logo } from "icons.slint";
+import { Button, ButtonKind, IconButton, HoverTip, Tip } from "components/button.slint";
+import { Switch } from "components/inputs.slint";
+import { Dot, Spinner } from "components/display.slint";
+import { ContextMenu, Toast, TooltipView } from "components/overlay.slint";
+import { ListScreen } from "screens/list.slint";
+import { NewDownloadDialog } from "dialogs/new_download.slint";
+import { SettingsDialog } from "dialogs/settings.slint";
+import { ConfirmDialog } from "dialogs/confirm.slint";
+import { TrafficDialog } from "dialogs/traffic.slint";
+import { App, NewDl, Prefs, SysState } from "types.slint";
+
+export { Theme, Icons, App, NewDl, Prefs, Tip }
+
+component Header {
+    height: 60px;
+    HorizontalLayout {
+        padding-left: 24px;
+        padding-right: 24px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            Logo {
+                size: 26px;
+            }
+        }
+        Text {
+            text: "SonicNet";
+            color: Theme.text;
+            font-size: Type.body;
+            font-weight: Type.medium;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        // System mode: whether every app's traffic is spread over the networks right now.
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 32px;
+                horizontal-stretch: 0;
+                border-radius: 16px;
+                background: sys-ta.has-hover ? Theme.field-hover : Theme.field;
+                accessible-role: button;
+                accessible-label: App.sys-label;
+                sys-ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        App.open-settings(4);
+                    }
+                }
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 13px;
+                    spacing: 8px;
+                    if App.sys-state == SysState.starting: VerticalLayout {
+                        alignment: center;
+                        Spinner {
+                            size: 14px;
+                        }
+                    }
+                    if App.sys-state == SysState.off || App.sys-state == SysState.permission || App.sys-state == SysState.error: VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            source: App.sys-state == SysState.off ? Icons.globe : App.sys-state == SysState.permission ? Icons.alert : Icons.alert-circle;
+                            tint: App.sys-state == SysState.off ? Theme.muted : App.sys-state == SysState.permission ? Theme.warning : Theme.danger;
+                            width: 14px;
+                            height: 14px;
+                        }
+                    }
+                    if App.sys-state == SysState.on: HorizontalLayout {
+                        spacing: 6px;
+                        for n in App.online: VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                source: Icons.kind(n.kind);
+                                tint: Theme.net(n.color);
+                                width: 14px;
+                                height: 14px;
+                            }
+                        }
+                    }
+                    Text {
+                        text: App.sys-label;
+                        color: App.sys-state == SysState.off ? Theme.muted : Theme.card-text;
+                        font-size: Type.item;
+                        vertical-alignment: center;
+                    }
+                }
+                HoverTip {
+                    hovered: sys-ta.has-hover;
+                    text: App.sys-tip;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 32px;
+                horizontal-stretch: 0;
+                border-radius: 16px;
+                background: pill-ta.has-hover ? Theme.field-hover : Theme.field;
+                pill-ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        App.open-settings(2);
+                    }
+                }
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 13px;
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        for n in App.online: VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                source: Icons.kind(n.kind);
+                                tint: Theme.net(n.color);
+                                width: 14px;
+                                height: 14px;
+                            }
+                        }
+                    }
+                    Text {
+                        text: App.networks-text;
+                        color: Theme.card-text;
+                        font-size: Type.item;
+                        vertical-alignment: center;
+                    }
+                }
+                HoverTip {
+                    hovered: pill-ta.has-hover;
+                    text: "Your networks — names, colours and limits";
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: Icons.sliders;
+                tooltip: "Settings";
+                clicked => {
+                    App.open-settings(0);
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                kind: ButtonKind.primary;
+                icon: Icons.plus;
+                text: "New download";
+                tooltip: "Ctrl+N";
+                clicked => {
+                    App.new-download();
+                }
+            }
+        }
+    }
+}
+
+component StatusBar {
+    height: 36px;
+    Rectangle {
+        background: Theme.rail;
+    }
+    HorizontalLayout {
+        padding-left: 24px;
+        padding-right: 18px;
+        spacing: 10px;
+        // Everything coming in, then each network's part: System mode and downloads together.
+        Rectangle {
+            width: speeds.preferred-width;
+            speeds-ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    App.traffic-open = true;
+                }
+            }
+            speeds := HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: Icons.arrow-down;
+                        width: 14px;
+                        height: 14px;
+                        tint: App.active ? Theme.text : Theme.muted;
+                    }
+                }
+                Text {
+                    text: App.total-speed;
+                    color: App.active ? Theme.text : Theme.muted;
+                    font-size: Type.item;
+                    font-weight: Type.medium;
+                    vertical-alignment: center;
+                }
+                for n in App.traffic-bar: HorizontalLayout {
+                    padding-left: 6px;
+                    spacing: 5px;
+                    VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            source: Icons.kind(n.kind);
+                            tint: Theme.net(n.color);
+                            width: 13px;
+                            height: 13px;
+                        }
+                    }
+                    if App.bar-names: Text {
+                        text: n.name;
+                        color: Theme.muted;
+                        font-size: Type.caption;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: n.down;
+                        color: n.busy ? Theme.card-text : Theme.muted;
+                        font-size: Type.caption;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            HoverTip {
+                hovered: speeds-ta.has-hover;
+                text: "What each network carries: click for details";
+            }
+        }
+        Text {
+            text: App.running;
+            color: Theme.muted;
+            font-size: Type.caption;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        if App.schedule-on: Rectangle {
+            width: sched.preferred-width;
+            sched-ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    App.open-settings(3);
+                }
+            }
+            sched := HorizontalLayout {
+                spacing: 6px;
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: Icons.clock;
+                        width: 13px;
+                        height: 13px;
+                        tint: App.schedule-open-now ? Theme.success : Theme.warning;
+                    }
+                }
+                Text {
+                    text: App.schedule-text;
+                    color: sched-ta.has-hover ? Theme.text : Theme.card-text;
+                    font-size: Type.caption;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        if App.limit-text != "": HorizontalLayout {
+            spacing: 6px;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    source: Icons.gauge;
+                    width: 13px;
+                    height: 13px;
+                    tint: Theme.card-text;
+                }
+            }
+            Text {
+                text: App.limit-text;
+                color: Theme.card-text;
+                font-size: Type.caption;
+                vertical-alignment: center;
+            }
+        }
+        Rectangle {
+            width: 8px;
+        }
+        Rectangle {
+            width: slow.preferred-width;
+            slow := HorizontalLayout {
+                spacing: 8px;
+                Switch {
+                    on: App.slow-mode;
+                    label: "Slow mode";
+                    toggled => {
+                        App.toggle-slow-mode();
+                    }
+                }
+                Text {
+                    text: App.slow-text;
+                    color: Theme.muted;
+                    font-size: Type.caption;
+                    vertical-alignment: center;
+                }
+            }
+            slow-ta := TouchArea {
+                clicked => {
+                    App.toggle-slow-mode();
+                }
+            }
+            HoverTip {
+                hovered: slow-ta.has-hover;
+                text: "Holds every download to a gentle speed, for a call or a game";
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "SonicNet";
+    icon: @image-url("../../assets/png/sonicnet-256.png");
+    preferred-width: 1180px;
+    preferred-height: 800px;
+    min-width: 920px;
+    min-height: 640px;
+    background: Theme.canvas;
+    default-font-family: Type.family;
+    default-font-size: Type.control;
+    default-font-weight: Type.regular;
+
+    property <bool> dialog-open: App.new-open || App.settings-open || App.confirm-open || App.traffic-open;
+    changed dialog-open => {
+        if (!self.dialog-open) {
+            keys.focus();
+        }
+    }
+
+    keys := FocusScope {
+        key-pressed(e) => {
+            if (e.text == Key.Escape) {
+                if (App.menu-open) {
+                    App.menu-open = false;
+                } else if (App.confirm-open) {
+                    App.confirm-open = false;
+                } else if (App.new-open) {
+                    NewDl.cancel();
+                } else if (App.settings-open) {
+                    Prefs.cancel();
+                } else if (App.traffic-open) {
+                    App.traffic-open = false;
+                } else {
+                    App.escape();
+                }
+                return accept;
+            }
+            if (root.dialog-open || App.menu-open) {
+                return reject;
+            }
+            if (e.modifiers.control && (e.text == "n" || e.text == "N")) {
+                App.new-download();
+                return accept;
+            }
+            if (e.modifiers.control && (e.text == "v" || e.text == "V")) {
+                App.paste-link();
+                return accept;
+            }
+            if (e.modifiers.control && (e.text == "a" || e.text == "A")) {
+                App.select-all();
+                return accept;
+            }
+            if (e.text == Key.Delete) {
+                App.delete-pressed();
+                return accept;
+            }
+            if (e.text == Key.DownArrow) {
+                App.move-focus(1);
+                return accept;
+            }
+            if (e.text == Key.UpArrow) {
+                App.move-focus(-1);
+                return accept;
+            }
+            if (e.text == Key.Return || e.text == " ") {
+                App.toggle-focused();
+                return accept;
+            }
+            reject
+        }
+
+        VerticalLayout {
+            Header { }
+            ListScreen {
+                vertical-stretch: 1;
+            }
+            StatusBar { }
+        }
+    }
+
+    if App.menu-open: ContextMenu {
+        width: 100%;
+        height: 100%;
+        items: App.menu-items;
+        at-x: App.menu-x;
+        at-y: App.menu-y;
+        chosen(id) => {
+            App.menu-open = false;
+            App.menu-action(id);
+        }
+        dismiss => {
+            App.menu-open = false;
+        }
+    }
+
+    if App.new-open: NewDownloadDialog {
+        width: 100%;
+        height: 100%;
+        init => {
+            self.focus-url();
+        }
+    }
+    if App.traffic-open: TrafficDialog {
+        width: 100%;
+        height: 100%;
+    }
+    if App.settings-open: SettingsDialog {
+        width: 100%;
+        height: 100%;
+    }
+    if App.confirm-open: ConfirmDialog {
+        width: 100%;
+        height: 100%;
+    }
+
+    if App.toast-shown: Toast {
+        x: parent.width - self.width - 24px;
+        y: parent.height - self.height - 36px - 16px;
+        width: 380px;
+        height: self.preferred-height;
+        title: App.toast-title;
+        body: App.toast-body;
+        dismiss => {
+            App.toast-shown = false;
+        }
+    }
+    Timer {
+        interval: 6s;
+        running: App.toast-shown;
+        triggered => {
+            App.toast-shown = false;
+        }
+    }
+
+    TooltipView {
+        limit-width: root.width;
+    }
+}

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SonicNet extension options</title>
+    <link rel="stylesheet" href="ui.css" />
+    <style>
+      body {
+        background: var(--canvas);
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 40px 16px 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      header img {
+        width: 36px;
+        height: 36px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 500;
+      }
+      h2 {
+        margin: 0 0 8px 4px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px;
+        border-radius: var(--radius-card);
+        background: var(--card);
+      }
+      .card .row {
+        flex-wrap: wrap;
+      }
+      .card .grow {
+        flex: 1 1 240px;
+      }
+      #min-size {
+        width: 84px;
+      }
+      #sites {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      #sites:empty {
+        display: none;
+      }
+      #sites li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 4px 4px 12px;
+        border-radius: var(--radius-control);
+      }
+      #sites li:hover,
+      #sites li:has(:focus-visible) {
+        background: var(--hover);
+      }
+      #sites li span {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      #empty {
+        padding: 10px 12px;
+      }
+      form {
+        display: flex;
+        gap: 8px;
+        padding: 6px;
+      }
+      form input {
+        flex: 1;
+        min-width: 0;
+      }
+      #add-hint {
+        margin: 8px 0 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon.svg" alt="" />
+        <div class="grow">
+          <h1>SonicNet</h1>
+          <span class="muted">Browser extension options</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Capture</h2>
+        <div class="card">
+          <label class="row" for="enabled">
+            <span class="grow">
+              <span class="title">Capture downloads</span>
+              <span class="muted">Downloads this browser starts go to SonicNet while it’s running. When it isn’t, or it can’t take a file, the browser keeps it.</span>
+            </span>
+            <input type="checkbox" role="switch" class="switch" id="enabled" />
+          </label>
+          <div class="row">
+            <label class="grow" for="min-size">
+              <span class="title">Minimum file size</span>
+              <span class="muted" id="min-hint">Smaller files stay in the browser. 0 sends every size.</span>
+            </label>
+            <input type="number" id="min-size" min="0" step="0.5" inputmode="decimal" aria-describedby="min-hint" />
+            <span class="muted">MB</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Excluded sites</h2>
+        <div class="card">
+          <ul id="sites"></ul>
+          <div id="empty" class="muted">None. Downloads from every site go to SonicNet.</div>
+          <form id="add-form">
+            <input type="text" id="add-site" placeholder="example.com" aria-label="Site to exclude" autocomplete="off" spellcheck="false" />
+            <button type="submit" class="primary">Exclude</button>
+          </form>
+        </div>
+        <p class="muted" id="add-hint">A site also covers its subdomains: example.com covers dl.example.com.</p>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

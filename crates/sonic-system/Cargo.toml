@@ -1,0 +1,35 @@
+[package]
+name = "sonic-system"
+description = "System mode: every app's connections balanced across the user's networks through a virtual adapter."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sonic-core.workspace = true
+sonic-net.workspace = true
+tokio = { workspace = true, features = ["signal"] }
+socket2.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# User-space TCP/IP stack: turns raw IP packets from the TUN into per-connection TCP streams and
+# per-flow UDP streams (see docs/system-mode.md, "Choosing the stack").
+ipstack = "1.0.1"
+
+[target.'cfg(windows)'.dependencies]
+# The TUN device (Wintun on Windows).
+tun-rs = { version = "2.8.12", features = ["async"] }
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_Security",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "signal"] }
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

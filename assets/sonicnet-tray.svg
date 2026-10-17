@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Monochrome tray mark: the app icon's streams without the tile, wider and on whole-pixel lines at 16 px.
+       Drawn white; the generator also emits a black copy for light taskbars. -->
+  <g fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 32v96l96 96 96-96V32M128 32v192"/>
+  </g>
+</svg>

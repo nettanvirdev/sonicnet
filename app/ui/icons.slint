@@ -1,0 +1,80 @@
+// Icons: filled SVGs on a 20-unit grid (ui/icons/, authored for SonicNet), tinted at runtime so
+// one file serves every colour and theme. No icon is drawn with a stroke.
+
+import { Theme } from "theme.slint";
+
+export global Icons {
+    out property <image> plus: @image-url("icons/plus.svg");
+    out property <image> x: @image-url("icons/x.svg");
+    out property <image> check: @image-url("icons/check.svg");
+    out property <image> dash: @image-url("icons/dash.svg");
+    out property <image> pause: @image-url("icons/pause.svg");
+    out property <image> play: @image-url("icons/play.svg");
+    out property <image> chevron-left: @image-url("icons/chevron-left.svg");
+    out property <image> chevron-right: @image-url("icons/chevron-right.svg");
+    out property <image> chevron-down: @image-url("icons/chevron-down.svg");
+    out property <image> chevron-up: @image-url("icons/chevron-up.svg");
+    out property <image> trash: @image-url("icons/trash.svg");
+    out property <image> folder: @image-url("icons/folder.svg");
+    out property <image> open: @image-url("icons/open.svg");
+    out property <image> link: @image-url("icons/link.svg");
+    out property <image> copy: @image-url("icons/copy.svg");
+    out property <image> sliders: @image-url("icons/sliders.svg");
+    out property <image> clock: @image-url("icons/clock.svg");
+    out property <image> alert: @image-url("icons/alert.svg");
+    out property <image> alert-circle: @image-url("icons/alert-circle.svg");
+    out property <image> info: @image-url("icons/info.svg");
+    out property <image> retry: @image-url("icons/retry.svg");
+    out property <image> arrow-down: @image-url("icons/arrow-down.svg");
+    out property <image> download: @image-url("icons/download.svg");
+    out property <image> gauge: @image-url("icons/gauge.svg");
+    out property <image> paste: @image-url("icons/paste.svg");
+    out property <image> bolt: @image-url("icons/bolt.svg");
+    out property <image> spinner: @image-url("icons/spinner.svg");
+    // Network kinds, in `NetworkKind` order.
+    out property <image> wifi: @image-url("icons/wifi.svg");
+    out property <image> ethernet: @image-url("icons/ethernet.svg");
+    out property <image> phone: @image-url("icons/phone.svg");
+    out property <image> cellular: @image-url("icons/cellular.svg");
+    out property <image> bridge: @image-url("icons/bridge.svg");
+    out property <image> virtual: @image-url("icons/virtual.svg");
+    out property <image> globe: @image-url("icons/globe.svg");
+    // The SonicNet mark, filled, for tinting onto its tile.
+    out property <image> mark: @image-url("art/mark.svg");
+
+    public pure function kind(k: int) -> image {
+        if (k == 0) { return wifi; }
+        if (k == 1) { return ethernet; }
+        if (k == 2) { return phone; }
+        if (k == 3) { return cellular; }
+        if (k == 4) { return bridge; }
+        if (k == 5) { return virtual; }
+        return globe;
+    }
+}
+
+export component Icon inherits Image {
+    in property <color> tint: Theme.card-text;
+    width: 16px;
+    height: 16px;
+    colorize: tint;
+    image-fit: contain;
+}
+
+// The SonicNet app icon: the mark on its tile (assets/sonicnet.svg). In dark mode the tile is
+// lifted off near-black so it still reads against the canvas.
+export component Logo {
+    in property <length> size: 24px;
+    width: size;
+    height: size;
+    Rectangle {
+        border-radius: root.size * 60 / 256;
+        background: Theme.dark ? #333333 : #161616;
+    }
+    Image {
+        width: 100%;
+        height: 100%;
+        source: Icons.mark;
+        colorize: #ffffff;
+    }
+}

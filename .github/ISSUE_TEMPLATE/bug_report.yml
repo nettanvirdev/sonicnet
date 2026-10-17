@@ -1,0 +1,56 @@
+name: Bug report
+description: Something doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Network setups vary a lot, so the details below really help.
+        **Please remove anything private** (public IPs, real file names, signed links) before posting.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Downloads
+        - System mode
+        - Browser extension
+        - UI / settings
+        - Installer
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: networks
+    attributes:
+      label: Your networks
+      description: Which connections (e.g. "Ethernet to ISP A, Wi-Fi to ISP B, iPhone USB tethering"), and whether they're separate internet lines.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SonicNet version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: |
+        Screenshots help most. For detailed logs, run `cargo run --release -p sonicnet` from a source checkout with `RUST_LOG=sonic_manager=debug` set; the installed app is a windowed program and prints nothing to a terminal.
+        **Before posting, remove download URLs (they can contain sign-in tokens), IP addresses and file paths.**
+      render: text

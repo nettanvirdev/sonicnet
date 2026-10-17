@@ -1,0 +1,78 @@
+import { Theme, Radius, Type } from "../theme.slint";
+import { Series, Seg } from "../types.slint";
+import { Label } from "display.slint";
+
+// Speed over time, one flat stacked band per network. Rust shapes the bands (`view::chart`) in
+// a 600 x 100 viewbox; here they are only stretched to fit. No gridlines, no outlines: the axis
+// is three labels beside the plot.
+export component ThroughputChart {
+    in property <[Series]> series;
+    in property <string> max-label;
+    in property <string> mid-label;
+    in property <string> caption;
+
+    VerticalLayout {
+        spacing: 14px;
+        Label {
+            text: root.caption;
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 12px;
+            Rectangle {
+                horizontal-stretch: 1;
+                min-height: 60px;
+                for s in root.series: Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: 600;
+                    viewbox-height: 100;
+                    fit: fill;
+                    commands: s.area;
+                    fill: s.faded ? Theme.net(s.color).with-alpha(0.4) : Theme.net(s.color);
+                }
+            }
+            Rectangle {
+                width: 52px;
+                Text {
+                    y: 0;
+                    width: 100%;
+                    text: root.max-label;
+                    color: Theme.muted;
+                    font-size: Type.stamp;
+                }
+                Text {
+                    y: parent.height * 0.5 - self.height / 2;
+                    width: 100%;
+                    text: root.mid-label;
+                    color: Theme.muted;
+                    font-size: Type.stamp;
+                }
+                Text {
+                    y: parent.height - self.height;
+                    width: 100%;
+                    text: root.max-label != "" ? "0" : "";
+                    color: Theme.muted;
+                    font-size: Type.stamp;
+                }
+            }
+        }
+    }
+}
+
+// Each network's share of the file, as one bar of flat segments separated by space.
+export component ShareBar {
+    in property <[Seg]> segments;
+    in property <length> thickness: 10px;
+    height: thickness;
+    Rectangle {
+        border-radius: root.thickness / 2;
+        background: Theme.track;
+        clip: true;
+        for seg[i] in root.segments: Rectangle {
+            x: parent.width * seg.start + (i > 0 ? 2px : 0px);
+            width: max(0px, parent.width * seg.share - (i > 0 ? 2px : 0px));
+            background: Theme.net(seg.color);
+        }
+    }
+}

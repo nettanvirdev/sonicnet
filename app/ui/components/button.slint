@@ -1,0 +1,217 @@
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon } from "../icons.slint";
+
+// The one tooltip, drawn by the window above everything else so no parent's clip can cut it.
+export global Tip {
+    in-out property <string> text;
+    // Where it points: the centre of the anchor's bottom edge, in window coordinates.
+    in-out property <length> x;
+    in-out property <length> y;
+    in-out property <bool> shown;
+}
+
+// Fills its parent and raises the tooltip after a short hover.
+export component HoverTip {
+    in property <bool> hovered;
+    in property <string> text;
+
+    Timer {
+        interval: 500ms;
+        running: root.hovered && root.text != "" && !Tip.shown;
+        triggered => {
+            Tip.text = root.text;
+            Tip.x = root.absolute-position.x + root.width / 2;
+            Tip.y = root.absolute-position.y + root.height;
+            Tip.shown = true;
+        }
+    }
+
+    changed hovered => {
+        if (!self.hovered && Tip.text == self.text) {
+            Tip.shown = false;
+        }
+    }
+}
+
+// - primary: solid black (white in dark), the one main action of a view.
+// - secondary: a quiet grey fill.
+// - ghost: no fill until hovered.
+// - danger: red text on a red tint; there is no solid red button.
+// - quiet-danger: red text, tinted only under the pointer.
+export enum ButtonKind { primary, secondary, ghost, danger, quiet-danger }
+
+export component Button {
+    in property <string> text;
+    in property <image> icon;
+    in property <ButtonKind> kind: ButtonKind.secondary;
+    in property <bool> enabled: true;
+    in property <bool> compact;
+    // A keyboard shortcut, shown dimmed after the label.
+    in property <string> hint;
+    in property <string> tooltip;
+    callback clicked;
+
+    property <bool> red: kind == ButtonKind.danger || kind == ButtonKind.quiet-danger;
+    property <color> fg: !enabled ? Theme.muted
+        : kind == ButtonKind.primary ? Theme.on-primary
+        : red ? Theme.danger
+        : Theme.text;
+    property <color> base: !enabled ? (kind == ButtonKind.ghost || kind == ButtonKind.quiet-danger ? transparent : Theme.field)
+        : kind == ButtonKind.primary ? Theme.primary
+        : kind == ButtonKind.secondary ? Theme.field
+        : kind == ButtonKind.danger ? Theme.danger.with-alpha(0.1)
+        : transparent;
+
+    min-height: compact ? 30px : 36px;
+    min-width: self.min-height;
+    // Buttons keep their natural width in a row unless asked to grow.
+    horizontal-stretch: 0;
+    accessible-role: button;
+    accessible-label: text != "" ? text : tooltip;
+    accessible-action-default => {
+        if (enabled) {
+            clicked();
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    Rectangle {
+        border-radius: Radius.control;
+        background: root.base;
+        animate background { duration: Motion.fast; }
+
+        // Hover and press wash over whatever the fill is.
+        Rectangle {
+            border-radius: Radius.control;
+            background: !root.enabled ? transparent
+                : root.red ? (ta.pressed ? Theme.danger.with-alpha(0.16) : ta.has-hover ? Theme.danger.with-alpha(0.09) : transparent)
+                : root.kind == ButtonKind.primary ? (ta.pressed ? Theme.on-primary.with-alpha(0.24) : ta.has-hover ? Theme.on-primary.with-alpha(0.14) : transparent)
+                : (ta.pressed ? Theme.pressed : ta.has-hover ? Theme.hover : transparent);
+            animate background { duration: Motion.fast; }
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: root.text == "" ? 0px : (root.icon.width > 0 ? 12px : 14px);
+        padding-right: root.text == "" ? 0px : 14px;
+        spacing: 7px;
+        alignment: center;
+
+        if root.icon.width > 0: VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.icon;
+                tint: root.fg;
+                width: 15px;
+                height: self.width;
+            }
+        }
+        if root.text != "": Text {
+            text: root.text;
+            color: root.fg;
+            font-size: root.compact ? Type.item : Type.control;
+            font-weight: Type.medium;
+            vertical-alignment: center;
+        }
+        if root.hint != "": Text {
+            text: root.hint;
+            color: root.fg.with-alpha(0.5);
+            font-size: Type.caption;
+            vertical-alignment: center;
+        }
+    }
+
+    HoverTip {
+        hovered: ta.has-hover;
+        text: root.tooltip;
+    }
+}
+
+// A square button around one icon, filled only under the pointer. Always has a tooltip: an
+// icon alone is ambiguous.
+export component IconButton {
+    in property <image> icon;
+    in property <string> tooltip;
+    in property <bool> enabled: true;
+    in property <bool> active;
+    in property <bool> danger;
+    in property <length> size: 32px;
+    in property <color> tint: Theme.card-text;
+    out property <bool> hovered: ta.has-hover;
+    callback clicked;
+
+    width: size;
+    height: size;
+    horizontal-stretch: 0;
+    accessible-role: button;
+    accessible-label: tooltip;
+    accessible-action-default => {
+        if (enabled) {
+            clicked();
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    Rectangle {
+        border-radius: Radius.control;
+        background: ta.pressed ? Theme.pressed : (ta.has-hover || root.active) ? (root.danger ? Theme.danger.with-alpha(0.1) : Theme.hover) : transparent;
+        animate background { duration: Motion.fast; }
+    }
+
+    Icon {
+        source: root.icon;
+        width: root.size * 0.5;
+        height: self.width;
+        tint: !root.enabled ? Theme.muted.with-alpha(0.6) : root.danger && ta.has-hover ? Theme.danger : (ta.has-hover || root.active) ? Theme.text : root.tint;
+    }
+
+    HoverTip {
+        hovered: ta.has-hover;
+        text: root.tooltip;
+    }
+}
+
+// Text that acts like a link: no box, darkens under the pointer.
+export component LinkButton {
+    in property <string> text;
+    in property <color> color: Theme.muted;
+    in property <length> font-size: Type.caption;
+    callback clicked;
+
+    accessible-role: button;
+    accessible-label: text;
+    accessible-action-default => {
+        clicked();
+    }
+
+    HorizontalLayout {
+        Text {
+            text: root.text;
+            color: ta.has-hover ? Theme.text : root.color;
+            font-size: root.font-size;
+            font-weight: Type.medium;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}

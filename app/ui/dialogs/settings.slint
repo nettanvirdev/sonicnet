@@ -1,0 +1,757 @@
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+import { Button, ButtonKind, LinkButton } from "../components/button.slint";
+import { Checkbox, Segmented, Switch, TextField } from "../components/inputs.slint";
+import { Badge, Panel, Label, ScrollArea } from "../components/display.slint";
+import { Dialog, DialogFooter } from "../components/overlay.slint";
+import { App, Prefs, NetPref, SysState, Tone } from "../types.slint";
+
+// One setting: what it is on the left, its control on the right.
+component SettingRow {
+    in property <string> title;
+    in property <string> body;
+
+    HorizontalLayout {
+        padding: 16px;
+        padding-left: 18px;
+        spacing: 24px;
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: Type.control;
+                font-weight: Type.medium;
+            }
+            if root.body != "": Text {
+                text: root.body;
+                color: Theme.muted;
+                font-size: Type.caption;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
+    }
+}
+
+// A group of settings: a recessed panel, rows separated by space.
+component Group inherits Panel {
+    VerticalLayout {
+        padding-top: 2px;
+        padding-bottom: 2px;
+        @children
+    }
+}
+
+component NavItem {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> active;
+    callback clicked;
+
+    height: 36px;
+    accessible-role: tab;
+    accessible-label: text;
+    accessible-item-selected: active;
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+    Rectangle {
+        border-radius: Radius.control;
+        background: root.active ? Theme.popover : ta.has-hover ? Theme.hover : transparent;
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.icon;
+                width: 15px;
+                height: 15px;
+                tint: root.active ? Theme.text : Theme.card-text;
+            }
+        }
+        Text {
+            text: root.text;
+            color: root.active ? Theme.text : Theme.card-text;
+            font-size: Type.item;
+            font-weight: root.active ? Type.medium : Type.regular;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component PageTitle {
+    in property <string> title;
+    in property <string> body;
+    VerticalLayout {
+        spacing: 4px;
+        padding-bottom: 14px;
+        Text {
+            text: root.title;
+            color: Theme.text;
+            font-size: Type.body;
+            font-weight: Type.medium;
+        }
+        Text {
+            text: root.body;
+            color: Theme.muted;
+            font-size: Type.caption;
+            wrap: word-wrap;
+        }
+    }
+}
+
+component Swatches {
+    in property <int> selected;
+    callback picked(int);
+
+    HorizontalLayout {
+        spacing: 6px;
+        // Auto: back to the kind's default.
+        Rectangle {
+            width: 48px;
+            height: 24px;
+            border-radius: 12px;
+            background: root.selected < 0 ? Theme.primary : auto-ta.has-hover ? Theme.field-hover : Theme.field;
+            Text {
+                text: "Auto";
+                color: root.selected < 0 ? Theme.on-primary : Theme.card-text;
+                font-size: Type.caption;
+            }
+            auto-ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.picked(-1);
+                }
+            }
+        }
+        for s[i] in Theme.swatches: Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: Theme.net(i);
+            accessible-role: button;
+            accessible-label: s.label;
+            // The chosen one carries a check; no rings.
+            if i == root.selected: Icon {
+                source: Icons.check;
+                width: 14px;
+                height: 14px;
+                tint: #ffffff;
+            }
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    root.picked(i);
+                }
+            }
+        }
+    }
+}
+
+component FieldName inherits Text {
+    color: Theme.card-text;
+    font-size: Type.item;
+    vertical-alignment: center;
+}
+
+component NetworkPrefs {
+    in property <NetPref> net;
+    in property <int> index;
+
+    Panel {
+        VerticalLayout {
+            padding: 18px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 12px;
+                Rectangle {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: Radius.control;
+                    background: Theme.net(root.net.color).with-alpha(Theme.dark ? 0.18 : 0.14);
+                    Icon {
+                        source: Icons.kind(root.net.kind);
+                        tint: Theme.net(root.net.color);
+                        width: 17px;
+                        height: 17px;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.net.custom-name != "" ? root.net.custom-name : root.net.os-name;
+                        color: Theme.text;
+                        font-size: Type.control;
+                        font-weight: Type.medium;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.net.description != "" ? root.net.description : root.net.os-name;
+                        color: Theme.muted;
+                        font-size: Type.caption;
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Badge {
+                        text: root.net.online ? "Connected" : "Offline";
+                        tone: root.net.online ? Tone.success : Tone.neutral;
+                    }
+                }
+            }
+            GridLayout {
+                spacing-horizontal: 16px;
+                spacing-vertical: 10px;
+                Row {
+                    FieldName {
+                        text: "Name";
+                        width: 104px;
+                    }
+                    TextField {
+                        text: root.net.custom-name;
+                        placeholder: root.net.os-name;
+                        edited(t) => {
+                            Prefs.net-edited(root.index, "name", t);
+                        }
+                    }
+                }
+                Row {
+                    FieldName {
+                        text: "Colour";
+                    }
+                    Swatches {
+                        selected: root.net.custom-color;
+                        picked(i) => {
+                            Prefs.pick-color(root.index, i);
+                        }
+                    }
+                }
+                Row {
+                    FieldName {
+                        text: "Speed limit";
+                    }
+                    HorizontalLayout {
+                        TextField {
+                            max-width: 200px;
+                            text: root.net.speed-limit;
+                            placeholder: "No limit";
+                            suffix: Prefs.unit-label;
+                            input-type: decimal;
+                            edited(t) => {
+                                Prefs.net-edited(root.index, "speed", t);
+                            }
+                        }
+                        Rectangle { }
+                    }
+                }
+                Row {
+                    FieldName {
+                        text: "Data allowance";
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        TextField {
+                            max-width: 200px;
+                            text: root.net.data-limit;
+                            placeholder: "Unlimited";
+                            suffix: "GB";
+                            input-type: decimal;
+                            edited(t) => {
+                                Prefs.net-edited(root.index, "data", t);
+                            }
+                        }
+                        Segmented {
+                            compact: true;
+                            options: ["a day", "a week", "a month"];
+                            selected: root.net.period;
+                            changed(i) => {
+                                Prefs.net-edited(root.index, "period", i);
+                            }
+                        }
+                        Rectangle { }
+                    }
+                }
+                Row {
+                    FieldName {
+                        text: "Used";
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout {
+                            alignment: center;
+                            width: 140px;
+                            Rectangle {
+                                height: 6px;
+                                border-radius: 3px;
+                                background: Theme.dark ? #ffffff1f : Theme.track;
+                                Rectangle {
+                                    x: 0;
+                                    width: parent.width * min(1, root.net.usage-fraction);
+                                    border-radius: 3px;
+                                    background: root.net.over ? Theme.danger : Theme.net(root.net.color);
+                                }
+                            }
+                        }
+                        Text {
+                            text: root.net.usage;
+                            color: root.net.over ? Theme.danger : Theme.card-text;
+                            font-size: Type.caption;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            LinkButton {
+                                text: "Reset";
+                                clicked => {
+                                    Prefs.reset-usage(root.net.id);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component DayToggle {
+    in property <string> text;
+    in property <bool> on;
+    in property <bool> enabled: true;
+    callback clicked;
+    width: 44px;
+    height: 32px;
+    accessible-role: checkbox;
+    accessible-checkable: true;
+    accessible-checked: on;
+    accessible-label: text;
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+    Rectangle {
+        border-radius: Radius.control;
+        background: root.on ? Theme.primary : ta.has-hover ? Theme.field-hover : Theme.field;
+        opacity: root.enabled ? 1 : 0.5;
+    }
+    Text {
+        text: root.text;
+        color: root.on ? Theme.on-primary : Theme.card-text;
+        font-size: Type.caption;
+        font-weight: Type.medium;
+    }
+}
+
+export component SettingsDialog {
+    Dialog {
+        width: 100%;
+        height: 100%;
+        title: "Settings";
+        subtitle: "Limits, networks, when downloads may run, and System-wide mode";
+        panel-width: 840px;
+        panel-height: 660px;
+        close => {
+            Prefs.cancel();
+        }
+
+        HorizontalLayout {
+            vertical-stretch: 1;
+            padding-left: 12px;
+            padding-right: 4px;
+            padding-bottom: 12px;
+            spacing: 4px;
+            Rectangle {
+                width: 188px;
+                border-radius: Radius.panel;
+                background: Theme.sunken;
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 2px;
+                    for item[i] in [
+                        { t: "General", i: Icons.sliders },
+                        { t: "Speed", i: Icons.gauge },
+                        { t: "Networks", i: Icons.wifi },
+                        { t: "Schedule", i: Icons.clock },
+                        { t: "System-wide", i: Icons.globe },
+                    ]: NavItem {
+                        text: item.t;
+                        icon: item.i;
+                        active: Prefs.page == i;
+                        clicked => {
+                            Prefs.page = i;
+                        }
+                    }
+                    Rectangle { }
+                }
+            }
+            ScrollArea {
+                horizontal-stretch: 1;
+                VerticalLayout {
+                    alignment: start;
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    padding-top: 6px;
+                    padding-bottom: 8px;
+
+                    if Prefs.page == 0: VerticalLayout {
+                        PageTitle {
+                            title: "General";
+                            body: "How SonicNet looks and how many downloads it runs together.";
+                        }
+                        Group {
+                            SettingRow {
+                                title: "Appearance";
+                                body: "System follows Windows' light or dark mode.";
+                                Segmented {
+                                    options: ["System", "Light", "Dark"];
+                                    selected: Prefs.theme;
+                                    changed(i) => {
+                                        Prefs.theme = i;
+                                        Prefs.changed();
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "Show speeds in";
+                                body: "Sizes stay in bytes either way. Mbps is what internet plans and speed tests use.";
+                                Segmented {
+                                    options: ["MB/s", "Mbps"];
+                                    selected: Prefs.unit;
+                                    changed(i) => {
+                                        Prefs.unit = i;
+                                        Prefs.changed();
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "Downloads at once";
+                                body: "The rest wait their turn in the queue.";
+                                Segmented {
+                                    options: ["1", "2", "3", "4"];
+                                    selected: Prefs.at-once;
+                                    changed(i) => {
+                                        Prefs.at-once = i;
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "Keep running when closed";
+                                body: "Closing the window leaves SonicNet in the tray, so downloads and the browser extension keep working.";
+                                Switch {
+                                    on: Prefs.tray;
+                                    toggled(on) => {
+                                        Prefs.tray = on;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if Prefs.page == 1: VerticalLayout {
+                        PageTitle {
+                            title: "Speed";
+                            body: "Leave room for everything else on your connections.";
+                        }
+                        Group {
+                            SettingRow {
+                                title: "Limit total speed";
+                                body: "All downloads together, over every network.";
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    TextField {
+                                        width: 150px;
+                                        text <=> Prefs.limit;
+                                        enabled: Prefs.limit-on;
+                                        suffix: Prefs.unit-label;
+                                        input-type: decimal;
+                                        align: right;
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Switch {
+                                            on: Prefs.limit-on;
+                                            toggled(on) => {
+                                                Prefs.limit-on = on;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "Slow mode speed";
+                                body: "Slow mode (in the status bar) holds every download to this, for a video call or a game.";
+                                TextField {
+                                    width: 150px;
+                                    text <=> Prefs.slow-speed;
+                                    suffix: Prefs.unit-label;
+                                    input-type: decimal;
+                                    align: right;
+                                }
+                            }
+                        }
+                    }
+
+                    if Prefs.page == 2: VerticalLayout {
+                        spacing: 10px;
+                        PageTitle {
+                            title: "Networks";
+                            body: "Name and colour your connections, cap their speed, and keep metered ones within their data allowance.";
+                        }
+                        for net[i] in Prefs.nets: NetworkPrefs {
+                            net: net;
+                            index: i;
+                        }
+                    }
+
+                    if Prefs.page == 3: VerticalLayout {
+                        spacing: 12px;
+                        PageTitle {
+                            title: "Schedule";
+                            body: "Let downloads run only at certain times — overnight, say, when no one else needs the connection.";
+                        }
+                        Group {
+                            SettingRow {
+                                title: "Only download on a schedule";
+                                body: "Downloads started outside the window wait in the queue.";
+                                Switch {
+                                    on: Prefs.sched-on;
+                                    toggled(on) => {
+                                        Prefs.sched-on = on;
+                                        Prefs.changed();
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "Between";
+                                body: "24-hour time. A window that ends before it starts runs past midnight.";
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    TextField {
+                                        width: 84px;
+                                        text <=> Prefs.sched-start;
+                                        enabled: Prefs.sched-on;
+                                        align: center;
+                                        edited => {
+                                            Prefs.changed();
+                                        }
+                                    }
+                                    Text {
+                                        text: "and";
+                                        color: Theme.muted;
+                                        font-size: Type.caption;
+                                        vertical-alignment: center;
+                                    }
+                                    TextField {
+                                        width: 84px;
+                                        text <=> Prefs.sched-stop;
+                                        enabled: Prefs.sched-on;
+                                        align: center;
+                                        edited => {
+                                            Prefs.changed();
+                                        }
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "On";
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    for d[i] in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]: DayToggle {
+                                        text: d;
+                                        on: Prefs.sched-days[i];
+                                        enabled: Prefs.sched-on;
+                                        clicked => {
+                                            Prefs.toggle-day(i);
+                                        }
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                title: "Until";
+                                body: "Stop scheduling after this date (YYYY-MM-DD).";
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    TextField {
+                                        width: 130px;
+                                        text <=> Prefs.sched-end;
+                                        enabled: Prefs.sched-end-on;
+                                        placeholder: "YYYY-MM-DD";
+                                        align: center;
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Switch {
+                                            on: Prefs.sched-end-on;
+                                            toggled(on) => {
+                                                Prefs.sched-end-on = on;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            padding-left: 4px;
+                            VerticalLayout {
+                                alignment: center;
+                                Icon {
+                                    source: Icons.clock;
+                                    width: 15px;
+                                    height: 15px;
+                                    tint: Theme.card-text;
+                                }
+                            }
+                            Text {
+                                text: Prefs.sched-summary;
+                                color: Theme.card-text;
+                                font-size: Type.caption;
+                                wrap: word-wrap;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+
+                    if Prefs.page == 4: VerticalLayout {
+                        spacing: 12px;
+                        PageTitle {
+                            title: "System-wide";
+                            body: "Every app's connections, not just SonicNet's downloads, spread over all your networks.";
+                        }
+                        Group {
+                            SettingRow {
+                                title: "Speed up every app";
+                                body: "Browsers, games, updates and streaming get the sum of your networks when they open several connections; a single connection still uses one network. Windows asks for permission each time SonicNet starts. Turning it off or quitting puts normal routing back at once.";
+                                Switch {
+                                    on: Prefs.system-mode;
+                                    toggled(on) => {
+                                        Prefs.system-mode = on;
+                                    }
+                                }
+                            }
+                        }
+                        Panel {
+                            VerticalLayout {
+                                padding: 16px;
+                                padding-left: 18px;
+                                spacing: 12px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Icon {
+                                            source: App.sys-state == SysState.on ? Icons.check : App.sys-state == SysState.permission ? Icons.alert : App.sys-state == SysState.error ? Icons.alert-circle : Icons.globe;
+                                            tint: App.sys-state == SysState.on ? Theme.success : App.sys-state == SysState.permission ? Theme.warning : App.sys-state == SysState.error ? Theme.danger : Theme.muted;
+                                            width: 15px;
+                                            height: 15px;
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 2px;
+                                        horizontal-stretch: 1;
+                                        Text {
+                                            text: App.sys-label;
+                                            color: Theme.text;
+                                            font-size: Type.control;
+                                            font-weight: Type.medium;
+                                        }
+                                        if App.sys-detail != "": Text {
+                                            text: App.sys-detail;
+                                            color: Theme.muted;
+                                            font-size: Type.caption;
+                                            wrap: word-wrap;
+                                        }
+                                    }
+                                    if App.sys-state == SysState.permission || App.sys-state == SysState.error: VerticalLayout {
+                                        alignment: center;
+                                        LinkButton {
+                                            text: "Try again";
+                                            clicked => {
+                                                App.sys-retry();
+                                            }
+                                        }
+                                    }
+                                }
+                                if App.sys-state == SysState.on: VerticalLayout {
+                                    spacing: 8px;
+                                    for net in App.traffic-bar: HorizontalLayout {
+                                        spacing: 10px;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Icon {
+                                                source: Icons.kind(net.kind);
+                                                tint: Theme.net(net.color);
+                                                width: 14px;
+                                                height: 14px;
+                                            }
+                                        }
+                                        Text {
+                                            width: 140px;
+                                            text: net.name;
+                                            color: Theme.card-text;
+                                            font-size: Type.item;
+                                            overflow: elide;
+                                            vertical-alignment: center;
+                                        }
+                                        Text {
+                                            text: net.system-line;
+                                            color: Theme.muted;
+                                            font-size: Type.caption;
+                                            vertical-alignment: center;
+                                            horizontal-stretch: 1;
+                                            overflow: elide;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        DialogFooter {
+            Text {
+                text: Prefs.error;
+                color: Theme.danger;
+                font-size: Type.caption;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+            Button {
+                kind: ButtonKind.ghost;
+                text: "Cancel";
+                clicked => {
+                    Prefs.cancel();
+                }
+            }
+            Button {
+                kind: ButtonKind.primary;
+                text: "Save";
+                clicked => {
+                    Prefs.save();
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,294 @@
+// Controls. All of them are fills on a surface: no outlines, and focus is a deeper fill.
+
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+
+export component Checkbox {
+    in property <bool> checked;
+    // Some but not all of what it stands for is checked (a group's box).
+    in property <bool> partial;
+    in property <color> accent: Theme.primary;
+    in property <bool> enabled: true;
+    in property <string> label;
+    out property <bool> hovered: ta.has-hover;
+    // Asks for the new value; the owner decides whether `checked` follows.
+    callback toggled(bool);
+
+    property <bool> on: checked || partial;
+    accessible-role: checkbox;
+    accessible-checkable: true;
+    accessible-checked: checked;
+    accessible-label: label;
+    accessible-action-default => {
+        if (enabled) {
+            toggled(!checked);
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: Radius.xs;
+                background: root.on ? root.accent : ta.has-hover && root.enabled ? Theme.field-hover : Theme.field-focus;
+                opacity: root.enabled ? 1 : 0.45;
+                animate background { duration: Motion.fast; }
+
+                Icon {
+                    width: 12px;
+                    height: 12px;
+                    source: root.checked ? Icons.check : Icons.dash;
+                    // On the inverting primary, the glyph inverts too; on a network colour it
+                    // stays white (dark ink on the lifted dark-theme hues).
+                    tint: root.accent == Theme.primary ? Theme.on-primary : Theme.dark ? #101010 : #ffffff;
+                    visible: root.on;
+                }
+            }
+        }
+        if root.label != "": Text {
+            text: root.label;
+            color: root.enabled ? Theme.text : Theme.muted;
+            font-size: Type.control;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled(!root.checked);
+        }
+    }
+}
+
+export component Switch {
+    in property <bool> on;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback toggled(bool);
+
+    accessible-role: switch;
+    accessible-checkable: true;
+    accessible-checked: on;
+    accessible-label: label;
+    accessible-action-default => {
+        if (enabled) {
+            toggled(!on);
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 32px;
+                height: 18px;
+                border-radius: 9px;
+                background: root.on ? Theme.primary : Theme.dark ? #3d3d3d : #cfcfcf;
+                opacity: root.enabled ? 1 : 0.45;
+                animate background { duration: Motion.base; }
+                Rectangle {
+                    x: root.on ? parent.width - self.width - 3px : 3px;
+                    y: 3px;
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 6px;
+                    background: root.on ? Theme.on-primary : Theme.popover;
+                    animate x { duration: Motion.base; easing: ease-out; }
+                }
+            }
+        }
+        if root.label != "": Text {
+            text: root.label;
+            color: Theme.text;
+            font-size: Type.item;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled(!root.on);
+        }
+    }
+}
+
+// A row of mutually exclusive options: a recessed track with the chosen one lifted.
+export component Segmented {
+    in property <[string]> options;
+    in property <int> selected;
+    in property <bool> compact;
+    in property <bool> enabled: true;
+    in property <bool> stretch;
+    callback changed(int);
+
+    min-height: compact ? 30px : 34px;
+    accessible-role: tab-list;
+
+    Rectangle {
+        background: Theme.field;
+        border-radius: Radius.control;
+    }
+
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 2px;
+        alignment: root.stretch ? LayoutAlignment.stretch : LayoutAlignment.start;
+        for option[i] in root.options: Rectangle {
+            horizontal-stretch: root.stretch ? 1 : 0;
+            border-radius: Radius.xs;
+            background: i == root.selected ? Theme.popover : seg-ta.has-hover && root.enabled ? Theme.hover : transparent;
+            animate background { duration: Motion.fast; }
+            accessible-role: tab;
+            accessible-label: option;
+            accessible-item-selected: i == root.selected;
+
+            HorizontalLayout {
+                padding-left: root.compact ? 10px : 12px;
+                padding-right: self.padding-left;
+                Text {
+                    text: option;
+                    font-size: root.compact ? Type.item : Type.control;
+                    font-weight: i == root.selected ? Type.medium : Type.regular;
+                    color: !root.enabled ? Theme.muted : i == root.selected ? Theme.text : Theme.card-text;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
+
+            seg-ta := TouchArea {
+                enabled: root.enabled;
+                mouse-cursor: pointer;
+                clicked => {
+                    root.changed(i);
+                }
+            }
+        }
+    }
+}
+
+export component TextField {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    // A short label inside the field, before the text ("Link").
+    in property <string> prefix;
+    // Units after the text ("MB/s").
+    in property <string> suffix;
+    in property <image> icon;
+    in property <bool> enabled: true;
+    in property <bool> invalid;
+    in property <bool> read-only;
+    in property <InputType> input-type: InputType.text;
+    in property <TextHorizontalAlignment> align: left;
+    out property <bool> has-focus: input.has-focus;
+    callback edited(string);
+    callback accepted(string);
+
+    public function focus-input() {
+        input.focus();
+    }
+
+    min-height: 36px;
+    horizontal-stretch: 1;
+    accessible-role: text-input;
+    accessible-label: placeholder != "" ? placeholder : prefix;
+    accessible-value: text;
+
+    Rectangle {
+        border-radius: Radius.control;
+        // Focus deepens the fill; an invalid value tints it.
+        background: root.invalid ? Theme.danger.with-alpha(0.09)
+            : input.has-focus ? Theme.field-focus
+            : ta.has-hover && root.enabled && !root.read-only ? Theme.field-hover
+            : Theme.field;
+        opacity: root.enabled ? 1 : 0.6;
+        animate background { duration: Motion.fast; }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: MouseCursor.text;
+        clicked => {
+            input.focus();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 6px;
+        spacing: 8px;
+
+        if root.icon.width > 0: VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.icon;
+                tint: Theme.muted;
+                width: 15px;
+                height: 15px;
+            }
+        }
+        if root.prefix != "": Text {
+            text: root.prefix;
+            color: Theme.muted;
+            font-size: Type.caption;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            // The text scrolls inside; it must never push the accessories out.
+            min-width: 0px;
+            clip: true;
+            input := TextInput {
+                width: 100%;
+                height: 100%;
+                single-line: true;
+                vertical-alignment: center;
+                horizontal-alignment: root.align;
+                font-size: Type.control;
+                color: root.enabled ? Theme.text : Theme.muted;
+                selection-background-color: Theme.primary.with-alpha(0.2);
+                selection-foreground-color: Theme.text;
+                enabled: root.enabled;
+                read-only: root.read-only;
+                input-type: root.input-type;
+                edited => {
+                    root.edited(self.text);
+                }
+                accepted => {
+                    root.accepted(self.text);
+                }
+            }
+            Text {
+                width: 100%;
+                height: 100%;
+                text: root.placeholder;
+                color: Theme.muted;
+                font-size: Type.control;
+                vertical-alignment: center;
+                horizontal-alignment: root.align;
+                visible: input.text == "";
+            }
+        }
+
+        if root.suffix != "": Text {
+            text: root.suffix;
+            color: Theme.muted;
+            font-size: Type.caption;
+            vertical-alignment: center;
+        }
+
+        // Accessories at the end (a Paste button, Browse…).
+        @children
+
+        Rectangle {
+            width: 0px;
+        }
+    }
+}

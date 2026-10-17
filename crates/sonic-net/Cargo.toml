@@ -1,0 +1,31 @@
+[package]
+name = "sonic-net"
+description = "Finds the computer's networks and opens connections through a chosen one."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sonic-core.workspace = true
+tokio.workspace = true
+socket2.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+rustls-platform-verifier.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+# Paused time makes the Happy Eyeballs timing tests exact and instant.
+tokio = { workspace = true, features = ["test-util"] }

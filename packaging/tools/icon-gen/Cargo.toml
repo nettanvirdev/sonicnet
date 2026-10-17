@@ -1,0 +1,14 @@
+﻿[package]
+name = "sonicnet-icon-gen"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Rasterises assets/*.svg into the PNGs and .ico files under assets/."
+
+# Standalone: not part of the app workspace, so the app never builds resvg.
+[workspace]
+
+[dependencies]
+# No text or raster images in the icons, so no font stack to build.
+resvg = { version = "0.48", default-features = false }
+ico = "0.5"

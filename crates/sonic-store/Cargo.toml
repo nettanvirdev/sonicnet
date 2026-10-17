@@ -1,0 +1,30 @@
+[package]
+name = "sonic-store"
+description = "Everything SonicNet keeps on disk: settings, history, saved progress, data usage."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sonic-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+directories.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+# Not in the workspace table: only the sealed cookies need it.
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

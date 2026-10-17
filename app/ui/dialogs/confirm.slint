@@ -1,0 +1,59 @@
+import { Theme, Type } from "../theme.slint";
+import { Icons } from "../icons.slint";
+import { Button, ButtonKind } from "../components/button.slint";
+import { Checkbox } from "../components/inputs.slint";
+import { Dialog, DialogFooter } from "../components/overlay.slint";
+import { App } from "../types.slint";
+
+// Asks before something that can't be undone.
+export component ConfirmDialog {
+    Dialog {
+        width: 100%;
+        height: 100%;
+        title: App.confirm-title;
+        panel-width: 440px;
+        close => {
+            App.confirm-open = false;
+        }
+
+        VerticalLayout {
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-bottom: 22px;
+            spacing: 16px;
+            Text {
+                text: App.confirm-body;
+                color: Theme.card-text;
+                font-size: Type.control;
+                wrap: word-wrap;
+            }
+            if App.confirm-trash-option: Checkbox {
+                label: "Also move finished files to the Recycle Bin";
+                checked: App.confirm-trash;
+                toggled(on) => {
+                    App.confirm-trash = on;
+                }
+            }
+        }
+        DialogFooter {
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            Button {
+                kind: ButtonKind.ghost;
+                text: "Keep";
+                clicked => {
+                    App.confirm-open = false;
+                }
+            }
+            Button {
+                kind: ButtonKind.danger;
+                icon: Icons.trash;
+                text: App.confirm-action;
+                clicked => {
+                    App.confirm();
+                }
+            }
+        }
+    }
+}

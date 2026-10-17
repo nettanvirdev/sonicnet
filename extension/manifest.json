@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "SonicNet",
+  "description": "Hands your browser's downloads to SonicNet, which downloads them over all your connections at once.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "SonicNet",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "permissions": ["downloads", "cookies", "contextMenus", "storage"],
+  "host_permissions": ["http://*/*", "https://*/*"]
+}

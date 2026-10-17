@@ -1,0 +1,353 @@
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+import { Button, ButtonKind } from "../components/button.slint";
+import { Checkbox, Segmented, TextField } from "../components/inputs.slint";
+import { Label, Spinner } from "../components/display.slint";
+import { Dialog, DialogFooter } from "../components/overlay.slint";
+import { NewDl, Chip, ProbeState } from "../types.slint";
+
+// A network to pick: a recessed tile, tinted with its colour once picked.
+component NetChip {
+    in property <Chip> chip;
+    callback toggle;
+    property <color> c: Theme.net(chip.color);
+
+    height: 60px;
+    accessible-role: checkbox;
+    accessible-checkable: true;
+    accessible-checked: chip.selected;
+    accessible-label: chip.name + ", " + chip.sub;
+    accessible-action-default => {
+        if (!chip.blocked) {
+            toggle();
+        }
+    }
+
+    ta := TouchArea {
+        enabled: !root.chip.blocked;
+        mouse-cursor: root.chip.blocked ? not-allowed : pointer;
+        clicked => {
+            root.toggle();
+        }
+    }
+    Rectangle {
+        border-radius: Radius.panel;
+        background: root.chip.selected ? root.c.with-alpha(Theme.dark ? 0.16 : 0.12) : ta.has-hover ? Theme.field-hover : Theme.field;
+        animate background { duration: Motion.fast; }
+    }
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 12px;
+        spacing: 12px;
+        opacity: root.chip.blocked ? 0.55 : 1;
+        VerticalLayout {
+            alignment: center;
+            Checkbox {
+                checked: root.chip.selected;
+                accent: root.c;
+                enabled: !root.chip.blocked;
+                toggled => {
+                    root.toggle();
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Icons.kind(root.chip.kind);
+                tint: root.c;
+                width: 18px;
+                height: 18px;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.chip.name;
+                color: Theme.text;
+                font-size: Type.control;
+                font-weight: Type.medium;
+                overflow: elide;
+            }
+            Text {
+                text: root.chip.sub;
+                color: root.chip.blocked ? Theme.danger : root.chip.warn ? Theme.warning : Theme.muted;
+                font-size: Type.caption;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+component FieldLabel {
+    in property <string> text;
+    in property <string> aside;
+    HorizontalLayout {
+        Label {
+            text: root.text;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: root.aside;
+            color: Theme.muted;
+            font-size: Type.caption;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component NewDownloadDialog {
+    property <bool> probed: NewDl.probe == ProbeState.ok;
+    property <length> chip-gap: 8px;
+
+    public function focus-url() {
+        url.focus-input();
+    }
+
+    // Probing waits for typing to pause, so a link typed by hand isn't fetched once per key.
+    debounce := Timer {
+        interval: 450ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            NewDl.probe-now(NewDl.url);
+        }
+    }
+
+    Dialog {
+        width: 100%;
+        height: 100%;
+        title: "New download";
+        subtitle: NewDl.from;
+        panel-width: 640px;
+        close => {
+            NewDl.cancel();
+        }
+
+        // The form scrolls between the pinned title and footer, so on a short window the panel
+        // shrinks to fit and the Start button is never cut off. The scrollbar stays hidden.
+        Flickable {
+            vertical-stretch: 1;
+            min-height: 120px;
+            preferred-height: body.preferred-height;
+            content-height: body.preferred-height;
+            body := VerticalLayout {
+            width: parent.width;
+            padding-left: 24px;
+            padding-right: 24px;
+            padding-top: 2px;
+            padding-bottom: 22px;
+            spacing: 18px;
+
+            VerticalLayout {
+                spacing: 8px;
+                FieldLabel {
+                    text: "Link";
+                }
+                url := TextField {
+                    icon: Icons.link;
+                    placeholder: "Paste a link to a file — https://…";
+                    text <=> NewDl.url;
+                    invalid: NewDl.probe == ProbeState.failed;
+                    edited(t) => {
+                        NewDl.url-edited(t);
+                        debounce.running = false;
+                        debounce.running = true;
+                    }
+                    accepted(t) => {
+                        debounce.running = false;
+                        NewDl.probe-now(t);
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Button {
+                            kind: ButtonKind.ghost;
+                            compact: true;
+                            icon: Icons.paste;
+                            text: "Paste";
+                            clicked => {
+                                NewDl.paste();
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    height: 18px;
+                    spacing: 7px;
+                    if NewDl.probe == ProbeState.checking: VerticalLayout {
+                        alignment: center;
+                        Spinner {
+                            size: 12px;
+                        }
+                    }
+                    if NewDl.probe == ProbeState.ok || NewDl.probe == ProbeState.failed: VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            width: 13px;
+                            height: 13px;
+                            source: NewDl.probe == ProbeState.ok ? (NewDl.splittable ? Icons.check : Icons.info) : Icons.alert-circle;
+                            tint: NewDl.probe == ProbeState.ok ? (NewDl.splittable ? Theme.success : Theme.warning) : Theme.danger;
+                        }
+                    }
+                    Text {
+                        text: NewDl.probe == ProbeState.checking ? "Checking the link…" : NewDl.probe == ProbeState.idle ? "SonicNet asks the server for the file's name and size before it starts." : NewDl.probe-message;
+                        color: NewDl.probe == ProbeState.failed ? Theme.danger : NewDl.probe == ProbeState.ok ? (NewDl.splittable ? Theme.card-text : Theme.warning) : Theme.muted;
+                        font-size: Type.caption;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                VerticalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    FieldLabel {
+                        text: "Save as";
+                    }
+                    TextField {
+                        icon: Icons.download;
+                        text <=> NewDl.file-name;
+                        placeholder: root.probed ? "File name" : "Known once the link is checked";
+                        enabled: root.probed;
+                    }
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    width: 128px;
+                    FieldLabel {
+                        text: "Size";
+                    }
+                    Rectangle {
+                        height: 36px;
+                        border-radius: Radius.control;
+                        background: Theme.sunken;
+                        Text {
+                            x: 12px;
+                            text: root.probed ? NewDl.size : "—";
+                            color: root.probed ? Theme.text : Theme.muted;
+                            font-size: Type.control;
+                            font-weight: Type.medium;
+                        }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 8px;
+                FieldLabel {
+                    text: "Folder";
+                    aside: NewDl.free-space;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    TextField {
+                        icon: Icons.folder;
+                        text: NewDl.folder;
+                        read-only: true;
+                        invalid: NewDl.low-space;
+                    }
+                    Button {
+                        text: "Browse…";
+                        clicked => {
+                            NewDl.browse();
+                        }
+                    }
+                }
+                if NewDl.low-space: Text {
+                    text: "There isn't enough free space on this drive for the file.";
+                    color: Theme.danger;
+                    font-size: Type.caption;
+                }
+            }
+
+            VerticalLayout {
+                spacing: 10px;
+                FieldLabel {
+                    text: "Networks";
+                    aside: NewDl.chips-summary;
+                }
+                Rectangle {
+                    height: Math.ceil(NewDl.chips.length / 2) * (60px + root.chip-gap) - root.chip-gap;
+                    for chip[i] in NewDl.chips: NetChip {
+                        chip: chip;
+                        width: (parent.width - root.chip-gap) / 2;
+                        x: Math.mod(i, 2) * (self.width + root.chip-gap);
+                        y: Math.floor(i / 2) * (60px + root.chip-gap);
+                        toggle => {
+                            NewDl.toggle-chip(i);
+                        }
+                    }
+                }
+            }
+
+            VerticalLayout {
+                spacing: 8px;
+                FieldLabel {
+                    text: "Streams per network";
+                }
+                HorizontalLayout {
+                    spacing: 14px;
+                    Segmented {
+                        options: ["Auto", "4", "8", "16", "32"];
+                        selected: NewDl.streams;
+                        enabled: NewDl.splittable;
+                        changed(i) => {
+                            NewDl.streams = i;
+                            NewDl.streams-changed(i);
+                        }
+                    }
+                    Text {
+                        text: NewDl.streams-hint;
+                        color: Theme.muted;
+                        font-size: Type.caption;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+
+            if NewDl.error != "": Text {
+                text: NewDl.error;
+                color: Theme.danger;
+                font-size: Type.caption;
+                wrap: word-wrap;
+            }
+            }
+        }
+
+        DialogFooter {
+            vertical-stretch: 0;
+            Text {
+                text: NewDl.summary;
+                color: Theme.card-text;
+                font-size: Type.item;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            Button {
+                kind: ButtonKind.ghost;
+                text: "Cancel";
+                clicked => {
+                    NewDl.cancel();
+                }
+            }
+            Button {
+                kind: ButtonKind.primary;
+                icon: Icons.download;
+                text: "Start download";
+                enabled: NewDl.can-start;
+                clicked => {
+                    NewDl.start();
+                }
+            }
+        }
+    }
+}

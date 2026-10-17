@@ -1,0 +1,51 @@
+[package]
+name = "sonicnet"
+description = "SonicNet: download faster by combining every internet connection you have."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+default-run = "sonicnet"
+
+[dependencies]
+sonic-core.workspace = true
+sonic-manager.workspace = true
+sonic-store.workspace = true
+# System mode: the elevated helper's code (src/bin/sonicnet-system.rs is built beside
+# sonicnet.exe) and the pipe protocol it speaks with the app.
+sonic-system = { path = "../crates/sonic-system" }
+serde.workspace = true
+directories.workspace = true
+# `software-renderer-path` lets the headless snapshot renderer draw Paths (icons, charts); the
+# on-screen window keeps Slint's default femtovg renderer.
+# `unstable-winit-030`: bringing the window to the front when a second launch asks for it.
+slint = { workspace = true, features = ["software-renderer-path", "unstable-winit-030"] }
+tokio.workspace = true
+rfd.workspace = true
+arboard.workspace = true
+open.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+# Encodes `--snapshot` renders; not in the workspace list because only the app writes images.
+png = "0.18"
+tray-icon.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Pipes",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+slint-build.workspace = true
+winresource.workspace = true
+
+[lints]
+workspace = true

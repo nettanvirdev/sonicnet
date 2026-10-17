@@ -1,0 +1,383 @@
+// Everything the Rust side fills in or calls. Rust builds these structs in `view.rs`; the screens
+// only lay them out, so every number on screen is formatted (and tested) in one place.
+
+export enum RowState { downloading, queued, paused, failed, finished }
+export enum DetailKind { running, complete, failed }
+export enum Tone { neutral, success, warning, danger }
+export enum ProbeState { idle, checking, ok, failed }
+// System mode, as the header pill and Settings show it.
+export enum SysState { off, starting, on, permission, error }
+
+// One network's part of a progress bar: `start` and `share` are fractions of the whole bar.
+export struct Seg {
+    color: int,
+    start: float,
+    share: float,
+}
+
+// A network on a card: which icon, which colour.
+export struct RowNet {
+    kind: int,
+    color: int,
+}
+
+export struct Row {
+    id: string,
+    name: string,
+    ext: string,
+    detail: string,
+    detail-tone: Tone,
+    state: RowState,
+    speed: string,
+    eta: string,
+    // 0 to 1; negative when the size is unknown.
+    progress: float,
+    segments: [Seg],
+    // The networks it is using (or used), as icons in their colours, and who gave what.
+    nets: [RowNet],
+    nets-tip: string,
+    selected: bool,
+    // Open in place, showing everything about it (only one at a time).
+    expanded: bool,
+    // Where the keyboard is: arrows move it, Enter or Space opens it.
+    focused: bool,
+}
+
+// One status group of the list (Downloading, Queued…). Groups are fixed, so each keeps its rows
+// model for life and a progress tick updates rows in place instead of rebuilding them.
+export struct Group {
+    title: string,
+    count: int,
+    checked: bool,
+    partial: bool,
+    rows: [Row],
+    // A link at the group's right ("Clear list"), if any.
+    action: string,
+}
+
+export struct StreamCell {
+    label: string,
+    speed: string,
+    hedge: bool,
+    active: bool,
+}
+
+export struct StreamRow {
+    cells: [StreamCell],
+}
+
+// A network as one download sees it.
+export struct NetLine {
+    id: string,
+    name: string,
+    kind: int,
+    color: int,
+    enabled: bool,
+    status: string,
+    status-tone: Tone,
+    explain: string,
+    speed: string,
+    bytes: string,
+    share: float,
+    share-text: string,
+    retries: int,
+    stream-count: int,
+    hedges: int,
+    streams: [StreamRow],
+    expanded: bool,
+    // Its ribbon in the flow diagram (a filled shape in a 100 x 100 viewbox) and its weight
+    // there (0 to 1).
+    curve: string,
+    weight: float,
+    label-y: float,
+}
+
+// One network's band of the stacked throughput chart (viewbox 600 x 100).
+export struct Series {
+    area: string,
+    color: int,
+    // Drawn lighter: the second kind of traffic in one network's chart (downloads).
+    faded: bool,
+}
+
+export struct Stat {
+    label: string,
+    value: string,
+}
+
+export struct Detail {
+    kind: DetailKind,
+    id: string,
+    name: string,
+    ext: string,
+    url: string,
+    folder: string,
+    state-text: string,
+    state-tone: Tone,
+    paused: bool,
+    queued: bool,
+    speed-value: string,
+    speed-unit: string,
+    avg: string,
+    peak: string,
+    multiplier: string,
+    multiplier-text: string,
+    sizes: string,
+    percent: string,
+    eta: string,
+    progress: float,
+    segments: [Seg],
+    // Where the ribbons meet on the right of the flow diagram (0 to 1, top and bottom).
+    flow-top: float,
+    flow-bottom: float,
+    chart-max: string,
+    chart-mid: string,
+    chart-caption: string,
+    has-chart: bool,
+    stats: [Stat],
+    blocks: image,
+    grid-w: float,
+    grid-h: float,
+    grid-cols: int,
+    grid-pitch: float,
+    block-count: int,
+    block-summary: string,
+    disk-limited: bool,
+    error: string,
+    resumable: bool,
+    missing: bool,
+    footer: string,
+}
+
+// One network's traffic: System mode and SonicNet's downloads (the status bar and the Networks
+// sheet). Every number is formatted by `view::traffic_nets`.
+export struct TrafficNet {
+    id: string,
+    name: string,
+    description: string,
+    kind: int,
+    color: int,
+    online: bool,
+    status: string,
+    status-tone: Tone,
+    // Combined, in and out.
+    down: string,
+    up: string,
+    // Anything moving through it right now.
+    busy: bool,
+    // System mode's part, for its card in Settings: "↓ 2.1 MB/s · ↑ 80 kB/s · 12 connections".
+    system-line: string,
+    connections: string,
+    session-system: string,
+    session-downloads: string,
+    today-system: string,
+    today-downloads: string,
+    // Its part of everything routed this session, 0 to 1.
+    share: float,
+    share-text: string,
+    chart: [Series],
+    chart-max: string,
+    chart-mid: string,
+}
+
+export struct MenuItem {
+    id: string,
+    label: string,
+    icon: image,
+    danger: bool,
+    separator: bool,
+}
+
+// A network to pick in New download.
+export struct Chip {
+    id: string,
+    name: string,
+    sub: string,
+    kind: int,
+    color: int,
+    selected: bool,
+    warn: bool,
+    blocked: bool,
+}
+
+// One network's settings, as edited.
+export struct NetPref {
+    id: string,
+    os-name: string,
+    // The adapter, as its driver describes it ("Intel(R) Wi-Fi 6 AX201").
+    description: string,
+    kind: int,
+    color: int,
+    custom-color: int,
+    custom-name: string,
+    speed-limit: string,
+    data-limit: string,
+    period: int,
+    usage: string,
+    usage-fraction: float,
+    over: bool,
+    online: bool,
+}
+
+export global App {
+    // Downloads list.
+    in property <[Group]> groups;
+    in property <int> filter: 0;
+    in property <[string]> filter-labels: ["All", "Active", "Finished", "Failed"];
+    in property <string> summary;
+    in property <int> selected-count;
+    in property <bool> sel-can-pause;
+    in property <bool> sel-can-resume;
+    in property <bool> empty: true;
+    in property <bool> filtered-empty;
+    in property <bool> no-networks;
+
+    // Header and status bar.
+    in property <[NetLine]> online;
+    in property <string> networks-text;
+    in property <string> total-speed;
+    in property <string> running;
+    in property <bool> active;
+    in property <bool> slow-mode;
+    in property <string> slow-text;
+    in property <string> limit-text;
+    in property <string> schedule-text;
+    in property <bool> schedule-on;
+    in property <bool> schedule-open-now;
+
+    // System mode and what every network carries.
+    in property <SysState> sys-state;
+    in property <string> sys-label;
+    in property <string> sys-tip;
+    // Why it is off this session (declined, or the error), for Settings.
+    in property <string> sys-detail;
+    in property <[TrafficNet]> traffic-nets;
+    // The connected ones, for the status bar.
+    in property <[TrafficNet]> traffic-bar;
+    // Names beside the status bar's network icons, while the window is wide enough for them
+    // (decided in Rust: in the layout it would be a binding loop).
+    in property <bool> bar-names;
+    in property <string> traffic-speed;
+    in property <string> traffic-session;
+    in-out property <bool> traffic-open;
+
+    // Download detail.
+    // The open card's content. `body-id` stays on a card while it closes, so it can animate shut.
+    in property <Detail> detail;
+    in-out property <string> body-id;
+    in property <[NetLine]> detail-nets;
+    in property <[Series]> detail-chart;
+    in-out property <string> relink-url;
+    in property <string> relink-error;
+
+    // Context menu.
+    in-out property <bool> menu-open;
+    in property <[MenuItem]> menu-items;
+    in-out property <length> menu-x;
+    in-out property <length> menu-y;
+
+    // Dialogs.
+    in-out property <bool> new-open;
+    in-out property <bool> settings-open;
+    in-out property <bool> confirm-open;
+    in property <string> confirm-title;
+    in property <string> confirm-body;
+    in property <string> confirm-action;
+    in property <bool> confirm-trash-option;
+    in-out property <bool> confirm-trash;
+
+    // A passing message.
+    in property <string> toast-title;
+    in property <string> toast-body;
+    in-out property <bool> toast-shown;
+
+    callback new-download();
+    callback paste-link();
+    callback set-filter(int);
+    callback row-pointer(string, bool, bool);
+    callback row-open(string);
+    callback move-focus(int);
+    callback toggle-focused();
+    // Esc on the list: close the open card, else clear the selection.
+    callback escape();
+    callback row-menu(string, length, length);
+    callback row-action(string);
+    callback select-group(int, bool);
+    callback group-action(int);
+    callback select-all();
+    callback clear-selection();
+    callback bulk(string);
+    callback delete-pressed();
+    callback menu-action(string);
+    callback detail-action(string);
+    callback toggle-network(string, bool);
+    callback expand-network(string);
+    callback relink();
+    callback confirm();
+    callback toggle-slow-mode();
+    callback open-settings(int);
+    // Try System mode again this session (after a declined prompt or an error).
+    callback sys-retry();
+    callback grid-resized(length);
+    pure callback block-info(int) -> string;
+}
+
+export global NewDl {
+    in-out property <string> url;
+    in property <ProbeState> probe: ProbeState.idle;
+    in property <string> probe-message;
+    in property <bool> splittable: true;
+    in-out property <string> file-name;
+    in property <string> size;
+    in property <string> folder;
+    in property <string> free-space;
+    in property <bool> low-space;
+    in property <[Chip]> chips;
+    in property <string> chips-summary;
+    in-out property <int> streams: 0;
+    in property <string> streams-hint;
+    in property <string> summary;
+    in property <bool> can-start;
+    in property <string> from;
+    in property <string> error;
+
+    callback url-edited(string);
+    callback probe-now(string);
+    callback paste();
+    callback browse();
+    callback toggle-chip(int);
+    callback streams-changed(int);
+    callback start();
+    callback cancel();
+}
+
+export global Prefs {
+    in-out property <int> page: 0;
+    in-out property <int> theme;
+    in-out property <int> unit;
+    in-out property <int> at-once;
+    in-out property <bool> tray;
+    in-out property <bool> system-mode;
+    in-out property <bool> limit-on;
+    in-out property <string> limit;
+    in-out property <string> slow-speed;
+    in property <string> unit-label: "MB/s";
+    in property <[NetPref]> nets;
+    in-out property <bool> sched-on;
+    in-out property <string> sched-start;
+    in-out property <string> sched-stop;
+    in property <[bool]> sched-days;
+    in-out property <bool> sched-end-on;
+    in-out property <string> sched-end;
+    in property <string> sched-summary;
+    in property <string> error;
+
+    callback save();
+    callback cancel();
+    callback changed();
+    callback toggle-day(int);
+    callback reset-usage(string);
+    callback pick-color(int, int);
+    // (network index, field: "name" | "speed" | "data" | "period", new value)
+    callback net-edited(int, string, string);
+}

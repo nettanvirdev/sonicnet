@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- SonicNet app icon: three streams (connections) converge into one downward point.
+       Flat by design: one solid rounded tile, one solid mark; no gradient, border or shadow.
+       Coordinates are multiples of 16 and lines 32 wide, so at 16 px every line lands on whole
+       pixels. -->
+  <title>SonicNet</title>
+  <rect width="256" height="256" rx="60" fill="#161616"/>
+  <g fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 64v64l64 64 64-64V64M128 64v128"/>
+  </g>
+</svg>

@@ -1,0 +1,18 @@
+[package]
+name = "sonic-bridge"
+description = "The local HTTP endpoint the browser extension hands downloads to."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sonic-core.workspace = true
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

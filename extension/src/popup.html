@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SonicNet</title>
+    <link rel="stylesheet" href="ui.css" />
+    <style>
+      body {
+        width: 320px;
+        padding: 8px;
+        background: var(--popover);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 4px 10px 12px;
+      }
+      header img {
+        width: 20px;
+        height: 20px;
+      }
+      header strong {
+        flex: 1;
+        font-weight: 500;
+      }
+      .notice {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 12px;
+        margin-bottom: 4px;
+        border-radius: var(--radius-card);
+        background: var(--card);
+      }
+      .notice button {
+        margin-top: 4px;
+      }
+      #site-host {
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0 0 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      footer span {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon.svg" alt="" />
+      <strong>SonicNet</strong>
+      <span class="pill" id="status" role="status">Checking…</span>
+    </header>
+
+    <div class="notice" id="not-running" hidden>
+      <span class="title">SonicNet isn’t running</span>
+      <span class="muted">Downloads stay in the browser until it is.</span>
+      <button type="button" class="primary" id="launch">Open SonicNet</button>
+    </div>
+
+    <div class="notice" id="outdated" hidden>
+      <span class="title">Update SonicNet</span>
+      <span class="muted">This extension needs a newer version of the app. Until then, downloads stay in the browser.</span>
+    </div>
+
+    <div class="notice" id="access" hidden>
+      <span class="muted">SonicNet needs access to websites to download files that need you to be signed in.</span>
+      <button type="button" class="primary" id="grant">Allow access</button>
+    </div>
+
+    <label class="row" for="enabled">
+      <span class="grow">
+        <span class="title">Capture downloads</span>
+        <span class="muted" id="enabled-hint"></span>
+      </span>
+      <input type="checkbox" role="switch" class="switch" id="enabled" />
+    </label>
+
+    <label class="row" for="site" id="site-row" hidden>
+      <span class="grow">
+        <span id="site-host"></span>
+        <span class="muted" id="site-hint"></span>
+      </span>
+      <input type="checkbox" role="switch" class="switch" id="site" />
+    </label>
+
+    <footer>
+      <span>Right-click a link › Download with SonicNet</span>
+      <button type="button" class="ghost" id="options">Options</button>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

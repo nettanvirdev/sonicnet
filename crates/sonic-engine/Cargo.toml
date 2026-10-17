@@ -1,0 +1,18 @@
+[package]
+name = "sonic-engine"
+description = "Pure download logic: planning, scheduling, stream counts, speeds and limits. No I/O."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sonic-core.workspace = true
+chrono.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

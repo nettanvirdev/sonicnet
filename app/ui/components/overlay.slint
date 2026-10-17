@@ -1,0 +1,242 @@
+// Things that float: dialogs, the context menu, the tooltip, toasts. They lift off the page by
+// being the lightest surface (popover) over a scrim, never by a shadow or an outline.
+
+import { Theme, Radius, Type, Motion } from "../theme.slint";
+import { Icon, Icons } from "../icons.slint";
+import { IconButton, Tip } from "button.slint";
+import { MenuItem } from "../types.slint";
+
+// A modal panel over a dimmed window. Its content goes in as children, below the title.
+export component Dialog {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <length> panel-width: 560px;
+    // Fixed height, or 0 to fit the content.
+    in property <length> panel-height: 0px;
+    callback close;
+
+    // Fades and lifts in once, when it appears.
+    property <bool> shown;
+    init => {
+        self.shown = true;
+    }
+
+    Rectangle {
+        background: Theme.scrim;
+        opacity: root.shown ? 1 : 0;
+        animate opacity { duration: Motion.base; }
+        TouchArea {
+            // A click beside the panel dismisses it, as Esc does.
+            clicked => {
+                root.close();
+            }
+        }
+    }
+
+    panel := Rectangle {
+        width: min(root.panel-width, root.width - 48px);
+        height: root.panel-height > 0 ? min(root.panel-height, root.height - 48px) : min(self.preferred-height, root.height - 48px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2 + (root.shown ? 0px : 12px);
+        opacity: root.shown ? 1 : 0;
+        animate y, opacity { duration: Motion.expand; easing: cubic-bezier(0.32, 0.72, 0, 1); }
+        background: Theme.popover;
+        border-radius: Radius.dialog;
+        clip: true;
+
+        // Swallows clicks so they don't reach the scrim.
+        TouchArea { }
+
+        VerticalLayout {
+            HorizontalLayout {
+                padding-left: 24px;
+                padding-right: 16px;
+                padding-top: 18px;
+                padding-bottom: 14px;
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 3px;
+                    Text {
+                        text: root.title;
+                        color: Theme.text;
+                        font-size: Type.title;
+                        font-weight: Type.medium;
+                    }
+                    if root.subtitle != "": Text {
+                        text: root.subtitle;
+                        color: Theme.muted;
+                        font-size: Type.item;
+                    }
+                }
+                VerticalLayout {
+                    alignment: start;
+                    IconButton {
+                        icon: Icons.x;
+                        tooltip: "Close (Esc)";
+                        clicked => {
+                            root.close();
+                        }
+                    }
+                }
+            }
+            @children
+        }
+    }
+}
+
+// A dialog's footer: a recessed band, content laid out by the caller.
+export component DialogFooter {
+    Rectangle {
+        background: Theme.sunken;
+    }
+    HorizontalLayout {
+        padding-left: 24px;
+        padding-right: 20px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 10px;
+        @children
+    }
+}
+
+export component ContextMenu {
+    in property <[MenuItem]> items;
+    in property <length> at-x;
+    in property <length> at-y;
+    callback chosen(string);
+    callback dismiss;
+
+    // Anything outside the menu closes it.
+    TouchArea {
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down) {
+                root.dismiss();
+            }
+        }
+    }
+
+    menu := Rectangle {
+        width: 228px;
+        height: self.preferred-height;
+        // Opens down-right of the pointer, flipping where the window ends.
+        x: root.at-x + self.width > root.width - 8px ? root.at-x - self.width : root.at-x;
+        y: root.at-y + self.height > root.height - 8px ? max(8px, root.at-y - self.height) : root.at-y;
+        background: Theme.popover;
+        border-radius: Radius.panel;
+
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 6px;
+            for item in root.items: VerticalLayout {
+                // A group break is space, not a line.
+                if item.separator: Rectangle {
+                    height: 6px;
+                }
+                if !item.separator: Rectangle {
+                    height: 32px;
+                    border-radius: Radius.xs;
+                    background: item-ta.has-hover ? (item.danger ? Theme.danger.with-alpha(0.1) : Theme.hover) : transparent;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 10px;
+                        VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                source: item.icon;
+                                width: 15px;
+                                height: 15px;
+                                tint: item.danger ? Theme.danger : Theme.card-text;
+                            }
+                        }
+                        Text {
+                            text: item.label;
+                            color: item.danger ? Theme.danger : Theme.text;
+                            font-size: Type.item;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                    item-ta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.chosen(item.id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The window's single tooltip, positioned from `Tip`.
+export component TooltipView {
+    in property <length> limit-width;
+    property <length> w: label.preferred-width + 18px;
+    x: max(6px, min(Tip.x - w / 2, root.limit-width - w - 6px));
+    y: Tip.y + 6px;
+    width: w;
+    // One line is 26px; a tip with several lines (System mode's per-network figures) grows.
+    height: max(26px, label.preferred-height + 12px);
+    visible: Tip.shown;
+
+    Rectangle {
+        background: Theme.primary;
+        border-radius: Radius.xs;
+    }
+    label := Text {
+        x: 9px;
+        width: root.width - 18px;
+        text: Tip.text;
+        color: Theme.on-primary;
+        font-size: Type.caption;
+    }
+}
+
+export component Toast {
+    in property <string> title;
+    in property <string> body;
+    callback dismiss;
+
+    Rectangle {
+        background: Theme.primary;
+        border-radius: Radius.panel;
+    }
+    HorizontalLayout {
+        padding: 12px;
+        padding-left: 16px;
+        spacing: 10px;
+        VerticalLayout {
+            spacing: 2px;
+            horizontal-stretch: 1;
+            alignment: center;
+            Text {
+                text: root.title;
+                color: Theme.on-primary;
+                font-size: Type.control;
+                font-weight: Type.medium;
+                wrap: word-wrap;
+            }
+            if root.body != "": Text {
+                text: root.body;
+                color: Theme.on-primary.with-alpha(0.7);
+                font-size: Type.item;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            alignment: start;
+            IconButton {
+                icon: Icons.x;
+                size: 26px;
+                tint: Theme.on-primary.with-alpha(0.7);
+                tooltip: "Dismiss";
+                clicked => {
+                    root.dismiss();
+                }
+            }
+        }
+    }
+}

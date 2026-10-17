@@ -1,0 +1,84 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/sonic-core",
+    "crates/sonic-net",
+    "crates/sonic-engine",
+    "crates/sonic-http",
+    "crates/sonic-store",
+    "crates/sonic-bridge",
+    "crates/sonic-manager",
+    "crates/sonic-testkit",
+    "crates/sonic-system",
+    "app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.88"
+
+# Every crate takes its third-party versions from here, so the workspace never builds two
+# versions of one library.
+[workspace.dependencies]
+sonic-core = { path = "crates/sonic-core" }
+sonic-net = { path = "crates/sonic-net" }
+sonic-engine = { path = "crates/sonic-engine" }
+sonic-http = { path = "crates/sonic-http" }
+sonic-store = { path = "crates/sonic-store" }
+sonic-bridge = { path = "crates/sonic-bridge" }
+sonic-manager = { path = "crates/sonic-manager" }
+
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "time", "sync", "fs", "io-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures = "0.3"
+bytes = "1.12"
+hyper = { version = "1.12", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls-platform-verifier = "0.7"
+socket2 = { version = "0.6", features = ["all"] }
+windows-sys = "0.61"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.28", features = ["v4", "serde"] }
+url = "2.5"
+percent-encoding = "2.3"
+httpdate = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+directories = "6.0"
+axum = "0.8"
+slint = "1.18"
+slint-build = "1.18"
+rfd = "0.17"
+arboard = "3.7"
+open = "5.4"
+trash = "5.2"
+tray-icon = "0.26"
+winresource = { version = "0.1.31", default-features = false }
+proptest = "1.12"
+tempfile = "3.27"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# Slint's generated code and image decoding are slow unoptimised; dependencies are optimised even
+# in debug builds so the app stays responsive while developing.
+[profile.dev.package."*"]
+opt-level = 2
