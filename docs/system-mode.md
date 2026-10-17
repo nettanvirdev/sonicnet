@@ -175,7 +175,7 @@ tunnel as 16 UDP flows, spread 9 Ethernet / 7 Wi-Fi, and all were answered.
   to the destination. A flow ends after 60 s of silence. QUIC (HTTP/3) is UDP 443 and works the same
   way. QUIC's connection migration can't move a flow between our networks (the server would see a
   new path), and that's fine: we keep a flow on its network. The prototype relays UDP and DNS was
-  verified. HTTP/3 itself wasn't tested, because this machine's curl 8.21 (Schannel) has no HTTP/3.
+  verified. HTTP/3 itself wasn't tested, because the test PC's curl 8.21 (Schannel) has no HTTP/3.
 - **IPv6:** the prototype routes only IPv4. Full mode adds a ULA address (e.g. `fd71::1/64`) to the
   adapter, takes the v6 default route with `::/1` + `8000::/1`, and dials over networks that have
   global v6. A destination whose family the chosen network lacks is placed on another network
@@ -347,11 +347,8 @@ would be fragmented or dropped. Keep 1500 (or 1280 for v6-safe) while UDP is rel
 
 ## Performance
 
-Measured on this machine. Ethernet and Wi-Fi are **two separate ISPs** (different public IPs and
-router MACs) whose routers both happen to use 192.168.0.1, so a shared gateway address does *not*
-mean a shared line. Aggregation is real here (the download mode reached 15.3 MB/s = Ethernet 10.5
-+ Wi-Fi 4.8). Wi-Fi's capacity swings with its signal (0.9 to 6 MB/s on different days), which is
-why placement follows measured capacity. The early runs below predate the capacity probe.
+Measured with Ethernet and a weaker Wi-Fi link on separate internet lines. The early runs below
+predate the capacity probe.
 
 | Test (8 parallel curl range requests) | Direct (default route, Ethernet) | Through System mode |
 |---|---|---|
